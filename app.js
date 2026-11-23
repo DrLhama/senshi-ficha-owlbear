@@ -198,6 +198,7 @@ function painelFicha() {
   }
   const quando = f.geradoEm ? new Date(f.geradoEm).toLocaleString("pt-BR") : "";
   return h("div", {},
+    (f.v || 1) < 2 ? h("p", { class: "nota alerta" }, "Esta ficha foi baixada numa versão antiga e está com skills cortadas e sem custos. Baixe de novo no site (botão Owlbear) e use Atualizar abaixo.") : null,
     fichaView(f, "proprio", "eu", (rc, novo) => { rc.atual = Math.max(0, Math.min(rc.max, Math.floor(novo))); aplicarMinhaFicha(f); }),
     h("div", { class: "linha", style: { marginTop: "14px" } },
       h("button", { onclick: () => entrada.click() }, "Atualizar (importar de novo)"),
