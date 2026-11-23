@@ -78,6 +78,11 @@
   .topo { user-select:none; }
   .linha select { width:auto; }
   .nome-skill { font-weight:600; }
+  .form-skill { display:grid; gap:6px; padding:10px; margin-bottom:8px; border:1px solid var(--linha); border-radius:10px; background:color-mix(in srgb,var(--tema) 6%,var(--card)); }
+  .acoes-skill { margin-top:10px; padding-top:8px; border-top:1px dashed var(--linha); }
+  .acoes-skill button { font-size:.76rem; padding:3px 9px; }
+  button.perigo { border-color:#b4524b; color:#ffb4ae; }
+  button.link { border:0; background:none; padding:0; color:var(--tema); text-decoration:underline; }
   .selo-ligada { padding:1px 8px; border-radius:99px; font-size:.64rem; letter-spacing:.12em; font-weight:700; color:var(--ok); background:color-mix(in srgb,var(--ok) 16%,transparent); border:1px solid color-mix(in srgb,var(--ok) 45%,transparent); }
   details.skill[data-ligada] { border-color:color-mix(in srgb,var(--ok) 55%,var(--linha)); box-shadow:inset 3px 0 0 var(--ok), 0 0 16px color-mix(in srgb,var(--ok) 14%,transparent); background:color-mix(in srgb,var(--ok) 6%,var(--card)); }
   .combo { display:flex; flex-wrap:wrap; gap:5px; margin:2px 0 6px; }

@@ -1,4 +1,4 @@
-import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo, VISUAIS_DADOS } from "./shared.js";
+import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo } from "./shared.js";
 
 const params = new URLSearchParams(location.search);
 const JANELA = params.get("janela");        // null = painel com abas; senão: ficha | iniciativa | mesa | jogador
@@ -38,7 +38,7 @@ const INI_VAZIA = () => ({ ativo: false, combatentes: [], vez: null, turnosPorCi
 // ── abrir janelas separadas ───────────────────────────────────
 const JANELAS = {
   ficha: { titulo: "Ficha", w: 400, h: 660 },
-  recursos: { titulo: "Recursos", w: 340, h: 280 },
+  recursos: { titulo: "Recursos", w: 320, h: 200 },
   skills: { titulo: "Skills", w: 420, h: 640 },
   iniciativa: { titulo: "Iniciativa", w: 360, h: 560 },
   mesa: { titulo: "Mesa", w: 420, h: 660 },
@@ -46,6 +46,7 @@ const JANELAS = {
 };
 // Posição e tamanho de cada janela ficam salvos: o jogador arruma uma vez e a janela abre sempre ali.
 const CHAVE_GEOM = "senshi/janelas";
+if (ler("senshi/geom-v") !== 2) { const g = ler("senshi/janelas") || {}; delete g.recursos; guardar("senshi/janelas", g); guardar("senshi/geom-v", 2); }
 const geomSalva = nome => (ler(CHAVE_GEOM) || {})[nome];
 const guardarGeom = (nome, g) => guardar(CHAVE_GEOM, { ...(ler(CHAVE_GEOM) || {}), [nome]: { ...geomSalva(nome), ...g } });
 const limitar = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -53,7 +54,7 @@ const limitar = (v, min, max) => Math.max(min, Math.min(max, v));
 async function abrirJanela(nome, extra = {}) {
   const cfg = JANELAS[nome];
   const largura = await OBR.viewport.getWidth();
-  const padrao = { left: { ficha: 16, recursos: 16, skills: 372, iniciativa: Math.max(16, (largura - cfg.w) / 2), mesa: Math.max(16, largura - cfg.w - 16), jogador: Math.max(16, largura - cfg.w - 60) }[nome], top: 70, w: cfg.w, h: cfg.h };
+  const padrao = { left: { ficha: 16, recursos: 16, skills: 372, iniciativa: Math.max(16, (largura - cfg.w) / 2), mesa: Math.max(16, largura - cfg.w - 16), jogador: Math.max(16, largura - cfg.w - 60) }[nome], top: 70, w: cfg.w, h: nome === "recursos" ? Math.max(120, 56 + 46 * (estado.ficha?.recursos?.length || 3)) : cfg.h };
   const g = { ...padrao, ...geomSalva(nome), ...extra.geom };
   guardarGeom(nome, g);
   const id = `senshi-${nome}${extra.jogador ? "-" + extra.jogador : ""}`;
@@ -333,14 +334,99 @@ function blocoDescricao(s, chave, original, editavel) {
       h("div", { class: "linha", style: { marginTop: "6px" } },
         h("button", { onclick: () => gravar(area.value.trim() && area.value.trim() !== original ? area.value.trim() : null) }, "Salvar"),
         h("button", { onclick: () => { editando.delete(chave); delete rascunho["ed:" + chave]; redesenhar(); } }, "Cancelar"),
-        propria != null ? h("button", { onclick: () => gravar(null) }, "Voltar ao original") : null),
-      h("p", { class: "nota" }, "Reescreva do jeito que quiser, por exemplo só o resumo. Fica salvo só neste navegador."));
+        propria != null ? h("button", { onclick: () => gravar(null) }, "Voltar ao original") : null));
   }
   return h("div", {},
     texto ? h("div", { class: "desc" }, texto) : null,
     editavel ? h("div", { class: "linha", style: { margin: "0 0 6px" } },
       h("button", { onclick: () => { editando.add(chave); redesenhar(); } }, texto ? "✎ Editar texto" : "✎ Escrever texto"),
       propria != null ? h("span", { class: "mudo" }, "(texto seu)") : null) : null);
+}
+
+// ── skills do jogador: tirar da lista, criar e editar ──────────
+// O que o jogador tira da lista fica guardado por nome (sobrevive a importar a ficha de novo).
+// As skills criadas por ele ficam na própria ficha, marcadas com `propria`, e são levadas junto ao importar.
+const CHAVE_OCULTAS = "senshi/skills-ocultas";
+const ocultasDoJogador = () => new Set(ler(CHAVE_OCULTAS) || []);
+const confirmando = new Set();        // skills com o pedido "tem certeza?" aberto
+const formAberto = new Set();         // formulários de skill abertos: "nova" ou o nome da skill
+
+function tirarDaLista(nome) {
+  const t = ocultasDoJogador(); t.add(nome);
+  guardar(CHAVE_OCULTAS, [...t]);
+  redesenhar();
+}
+const restaurarOcultas = () => { guardar(CHAVE_OCULTAS, []); redesenhar(); };
+
+function abrirFormSkill(f, original) {
+  const k = original?.nome || "nova";
+  const m = original?.modos?.[0];
+  const d = m?.uso?.deltas?.[0];
+  Object.assign(rascunho, {
+    [`sk:${k}:nome`]: original?.nome || "", [`sk:${k}:tipo`]: original?.tipo || "ativa", [`sk:${k}:desc`]: original?.desc || "",
+    [`sk:${k}:dados`]: m?.rolagem || "", [`sk:${k}:rec`]: d?.id || "", [`sk:${k}:custo`]: d ? String(Math.abs(d.delta)) : "", [`sk:${k}:erro`]: "",
+  });
+  formAberto.add(k);
+  redesenhar();
+}
+function fecharFormSkill(k) {
+  formAberto.delete(k);
+  for (const c of ["nome", "tipo", "desc", "dados", "rec", "custo", "erro"]) delete rascunho[`sk:${k}:${c}`];
+  redesenhar();
+}
+
+function salvarSkill(f, original) {
+  const k = original?.nome || "nova";
+  const r = c => rascunho[`sk:${k}:${c}`] ?? "";
+  const nome = r("nome").trim();
+  if (!nome) { rascunho[`sk:${k}:erro`] = "Dê um nome para a skill."; return redesenhar(); }
+  if (f.skills.some(x => x.nome === nome && x !== original)) { rascunho[`sk:${k}:erro`] = "Já existe uma skill com esse nome."; return redesenhar(); }
+  const valor = Math.max(0, Math.floor(Number(r("custo")) || 0));
+  const recurso = f.recursos.find(x => x.id === r("rec"));
+  const deltas = recurso && valor ? [{ id: recurso.id, nome: recurso.nome, delta: -valor }] : [];
+  const nova = {
+    propria: true, nome, tipo: r("tipo") === "passiva" ? "passiva" : "ativa", ligada: original?.ligada || false,
+    custo: "", cd: "", acoes: [], desc: r("desc").trim(),
+    modos: [{ nome: "", acoes: [], resumo: "", desc: "", rolagem: r("dados").trim(), uso: { deltas, faltas: [], unico: false }, custos: deltas.map(d => `${d.nome} ${d.delta}`), pecas: [], efeitos: [], reservas: [] }],
+  };
+  if (original?.modoLigado != null) nova.modoLigado = original.modoLigado;
+  if (original) f.skills[f.skills.indexOf(original)] = nova; else f.skills.push(nova);
+  fecharFormSkill(k);
+  aplicarMinhaFicha(f);
+}
+
+function formularioSkill(f, original) {
+  const k = original?.nome || "nova";
+  const sel = (campo, opcoes) => Object.assign(h("select", { onchange: e => { rascunho[`sk:${k}:${campo}`] = e.target.value; } }, opcoes.map(([v, t]) => h("option", { value: v }, t))), { value: rascunho[`sk:${k}:${campo}`] ?? "" });
+  const area = h("textarea", { "data-foco": `sk:${k}:desc`, rows: 3, placeholder: "O que ela faz (um lembrete curto basta)" });
+  area.value = rascunho[`sk:${k}:desc`] ?? "";
+  area.addEventListener("input", () => { rascunho[`sk:${k}:desc`] = area.value; });
+  const erro = rascunho[`sk:${k}:erro`];
+  return h("div", { class: "form-skill" },
+    h("strong", {}, original ? "Editar skill" : "Nova skill"),
+    campo(`sk:${k}:nome`, { placeholder: "Nome", "aria-label": "Nome da skill" }),
+    h("div", { class: "grade2" },
+      sel("tipo", [["ativa", "Ativa"], ["passiva", "Passiva"]]),
+      campo(`sk:${k}:dados`, { placeholder: "Dados · ex.: 1d20+5, 2d8", "aria-label": "Dados da skill", spellcheck: "false" })),
+    area,
+    h("div", { class: "grade2" },
+      sel("rec", [["", "Sem custo"], ...f.recursos.map(x => [x.id, `Custa ${x.nome}`])]),
+      campo(`sk:${k}:custo`, { placeholder: "Quanto custa", inputmode: "numeric", "aria-label": "Valor do custo" })),
+    erro ? h("p", { class: "nota alerta" }, erro) : null,
+    h("div", { class: "linha" }, h("button", { class: "rolar", onclick: () => salvarSkill(f, original) }, "Salvar"), h("button", { onclick: () => fecharFormSkill(k) }, "Cancelar")));
+}
+
+/** Botões no fim da skill: editar/excluir (as do jogador) ou tirar da lista (as da ficha), sempre com confirmação. */
+function acoesDaSkill(f, s, chave) {
+  const confirma = confirmando.has(chave);
+  const pergunta = (rotulo, aoConfirmar) => confirma
+    ? h("span", { class: "linha" }, h("button", { class: "perigo", onclick: aoConfirmar }, "Confirmar"), h("button", { onclick: () => { confirmando.delete(chave); redesenhar(); } }, "Cancelar"))
+    : h("button", { onclick: () => { confirmando.add(chave); redesenhar(); } }, rotulo);
+  return h("div", { class: "linha acoes-skill" },
+    s.propria ? h("button", { onclick: () => abrirFormSkill(f, s) }, "✎ Editar skill") : null,
+    s.propria
+      ? pergunta("Excluir", () => { confirmando.delete(chave); f.skills.splice(f.skills.indexOf(s), 1); aplicarMinhaFicha(f); })
+      : pergunta("Tirar da lista", () => { confirmando.delete(chave); tirarDaLista(s.nome); }));
 }
 
 function skillEl(s, chave, editavel, f) {
@@ -354,11 +440,13 @@ function skillEl(s, chave, editavel, f) {
     custosDosModos.map(c => chip("", c, true)),
   ];
   const corpo = h("div", { class: "corpo" },
+    editavel && formAberto.has(s.nome) ? formularioSkill(f, s) : null,
     blocoDescricao(s, chave, desc, editavel),
     modos.length === 1 && !modos[0].nome
       ? blocoModo(modos[0], desc, true, editavel ? { f, s, i: 0, chave: `${chave}:m0` } : null)
       : modos.map((m, i) => h("div", { class: "modo" }, m.nome ? h("h3", {}, m.nome) : null, blocoModo(m, desc, false, editavel ? { f, s, i, chave: `${chave}:m${i}` } : null))),
-    !desc && !modos.length ? h("p", { class: "mudo" }, "Sem descrição.") : null);
+    !desc && !modos.length ? h("p", { class: "mudo" }, "Sem descrição.") : null,
+    editavel ? acoesDaSkill(f, s, chave) : null);
   // botão do resumo: o modo que está ligado, ou o primeiro com dados ou custo (ou o primeiro)
   const iResumo = !editavel || !modos.length ? -1
     : s.ligada ? Math.min(modoLigadoDe(s), modos.length - 1)
@@ -370,8 +458,7 @@ function skillEl(s, chave, editavel, f) {
       h("span", { class: "linha" },
         iResumo >= 0 ? botaoUsar(f, s, iResumo, `${chave}:m${iResumo}`) : null,
         podeDesligar ? h("button", { class: "rolar", title: "Desliga a skill (o custo já pago não volta)", onclick: e => { e.preventDefault(); e.stopPropagation(); desligarSkill(f, s); } }, "Desligar") : null,
-        estaLigadaNaLista ? h("span", { class: "selo-ligada" }, "LIGADA") : null,
-        h("span", { class: "mudo" }, s.tipo))),
+        estaLigadaNaLista ? h("span", { class: "selo-ligada" }, "LIGADA") : null)),
     iResumo >= 0 ? resultadoRolagem(`${chave}:ult`) : null,
     chips.flat(Infinity).some(Boolean) ? h("div", { class: "chips" }, chips) : null);
   const el = details(chave, resumo, corpo, "skill");
@@ -431,20 +518,21 @@ function comTema(f, ...filhos) {
 const secaoRecursos = (f, modo, chave, aoMudar) => f.recursos.map(rc => barra(rc, modo, aoMudar, `${chave}:${rc.id}`));
 
 /** As skills ficam na ordem da ficha: ligar uma não a muda de lugar. A chave usa o nome, não a posição. */
+const skillsVisiveis = (f, modo) => modo === "proprio" ? (f.skills || []).filter(s => !ocultasDoJogador().has(s.nome)) : (f.skills || []);
+
 function listaSkills(f, modo, chave) {
   const vistos = {};
-  return (f.skills || []).map(s => skillEl(s, `${chave}:s:${s.nome}${(vistos[s.nome] = (vistos[s.nome] || 0) + 1) > 1 ? "#" + vistos[s.nome] : ""}`, modo === "proprio", f));
+  return skillsVisiveis(f, modo).map(s => skillEl(s, `${chave}:s:${s.nome}${(vistos[s.nome] = (vistos[s.nome] || 0) + 1) > 1 ? "#" + vistos[s.nome] : ""}`, modo === "proprio", f));
 }
 
 function fichaView(f, modo, chave, aoMudar) {
   return comTema(f,
     h("div", { class: "cab" }, h("strong", {}, f.nome), h("span", { class: "mudo" }, `Nível ${f.nivel}${f.origem ? " · " + f.origem : ""}`)),
-    h("h2", {}, "Recursos"),
     secaoRecursos(f, modo, chave, aoMudar),
     h("h2", {}, "Atributos"),
     h("div", { class: "attrs" }, f.atributos.map(a => h("div", { class: "attr", style: { borderLeftColor: a.cor } }, h("small", {}, `${a.nome} · ${a.dado}`), h("b", {}, a.valor)))),
     f.secundarios?.length ? [h("h2", {}, "Secundários"), h("div", { class: "chips" }, f.secundarios.map(s => chip(s.nome, s.valor)))] : null,
-    h("h2", {}, `Skills (${(f.skills || []).length})`),
+    h("h2", {}, `Skills (${skillsVisiveis(f, modo).length})`),
     listaSkills(f, modo, chave));
 }
 
@@ -462,6 +550,8 @@ function importarArquivo(arquivo) {
     try {
       const dados = JSON.parse(String(leitor.result));
       if (dados?.formato !== "senshi-owlbear") throw new Error("Esse não é o arquivo do Owlbear. No site, use o botão Owlbear nos controles da ficha (não o botão JSON).");
+      const novas = dados.skills || (dados.skills = []);
+      for (const propria of (estado.ficha?.skills || []).filter(s => s.propria)) if (!novas.some(x => x.nome === propria.nome)) novas.push(propria);
       aplicarMinhaFicha(dados);
     } catch (e) { alert(e instanceof Error ? e.message : "Arquivo inválido."); }
   };
@@ -501,77 +591,52 @@ const mudarRecurso = f => (rc, expr) => {
   aplicarMinhaFicha(f);
 };
 
-// ── aparência e visibilidade dos dados (Dice+) ────────────────
-const CHAVE_ESTILO = "senshi/estilo-dados";
-const FONTES_DADOS = [["standard", "Padrão"], ["norse", "Nórdica"], ["aelfa", "Élfica"]];
+// ── quem vê as rolagens (Dice+) ───────────────────────────────
+const seletorQuemVe = () => h("label", { class: "linha mudo", style: { margin: "0 0 8px" } }, "Quem vê as rolagens",
+  Object.assign(h("select", { "aria-label": "Quem vê as rolagens", onchange: e => guardar(CHAVE_ALVO, e.target.value) },
+    ALVOS_ROLAGEM.map(([v, t]) => h("option", { value: v }, t))), { value: ler(CHAVE_ALVO) || "everyone" }));
+
 const luz = hex => { const n = parseInt(String(hex).replace("#", "").padEnd(6, "0").slice(0, 6), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
 
-/** O visual escolhido, já como "estilo padrão" do Dice+. Sem escolha, usa a cor da própria ficha. */
+/** Visual dos dados enviado ao Dice+: a cor da ficha. (O saco de dados do próprio jogador no Dice+ vale mais.) */
 function estiloDados() {
-  const s = ler(CHAVE_ESTILO) || { preset: "ficha" };
   const tema = estado.ficha?.cores?.tema || "#9a9aa4";
-  const base = s.preset === "ficha" || !VISUAIS_DADOS[s.preset]
-    ? { color: tema, numberColor: luz(tema) > 0.55 ? "#10101a" : "#ffffff", metalness: 0.5, roughness: 0.3, sheen: 0.4 }
-    : (({ nome, ...resto }) => resto)(VISUAIS_DADOS[s.preset]);
-  return { ...base, ...(s.cor ? { color: s.cor } : {}), ...(s.numero ? { numberColor: s.numero } : {}), ...(s.fonte ? { font: s.fonte } : {}) };
-}
-
-function painelDados() {
-  const s = ler(CHAVE_ESTILO) || { preset: "ficha" };
-  const atual = estiloDados();
-  const salvar = p => { guardar(CHAVE_ESTILO, { ...s, ...p }); redesenhar(); };
-  const corpo = h("div", { class: "interno dados-cfg" },
-    h("label", {}, "Quem vê as rolagens",
-      Object.assign(h("select", { onchange: e => guardar(CHAVE_ALVO, e.target.value) }, ALVOS_ROLAGEM.map(([v, t]) => h("option", { value: v }, t))), { value: ler(CHAVE_ALVO) || "everyone" })),
-    h("label", {}, "Visual dos dados",
-      Object.assign(h("select", { onchange: e => salvar({ preset: e.target.value, cor: undefined, numero: undefined, fonte: undefined }) },
-        Object.entries(VISUAIS_DADOS).map(([id, v]) => h("option", { value: id }, v.nome))), { value: s.preset || "ficha" })),
-    h("div", { class: "grade2" },
-      h("label", {}, "Cor do dado", h("input", { type: "color", value: atual.color, onchange: e => salvar({ cor: e.target.value }) })),
-      h("label", {}, "Cor dos números", h("input", { type: "color", value: atual.numberColor, onchange: e => salvar({ numero: e.target.value }) }))),
-    h("label", {}, "Fonte dos números",
-      Object.assign(h("select", { onchange: e => salvar({ fonte: e.target.value }) }, FONTES_DADOS.map(([v, t]) => h("option", { value: v }, t))), { value: atual.font || "standard" })),
-    h("p", { class: "nota" }, "O Dice+ usa os dados do seu próprio saco, se você já montou um lá. Este visual vale para os tipos de dado que não estão no seu saco."));
-  return details("dados-cfg", h("span", {}, "🎲 Dados · quem vê e aparência"), corpo, "jogador");
+  return { color: tema, numberColor: luz(tema) > 0.55 ? "#10101a" : "#ffffff", metalness: 0.5, roughness: 0.3, sheen: 0.4 };
 }
 
 // ── janelas separadas: só recursos e só skills ────────────────
+/** Janela pequena e fixa: só as barras. */
 function painelRecursos() {
   const f = estado.ficha;
   if (!f) return painelSemFicha();
-  return comTema(f,
-    h("div", { class: "cab" }, h("strong", {}, f.nome), h("span", { class: "mudo" }, `Nível ${f.nivel}${f.origem ? " · " + f.origem : ""}`)),
-    h("h2", {}, "Recursos"),
-    secaoRecursos(f, "proprio", "rc", mudarRecurso(f)),
-    h("p", { class: "nota" }, "Digite no número: 25 define, +25 soma, -25 tira, -50% tira metade do máximo. Enter aplica."),
-    estado.publicacao ? h("p", { class: "nota " + (estado.publicacao.startsWith("Não") ? "alerta" : "ok") }, estado.publicacao) : null);
+  return comTema(f, secaoRecursos(f, "proprio", "rc", mudarRecurso(f)));
 }
 
 function painelSkills() {
   const f = estado.ficha;
   if (!f) return painelSemFicha();
+  const fora = (f.skills || []).length - skillsVisiveis(f, "proprio").length;
   return comTema(f,
     // os recursos ficam à vista aqui em cima: dá para ver o custo saindo ao usar uma skill
     h("div", { class: "tira" }, secaoRecursos(f, "proprio", "sk", mudarRecurso(f))),
-    painelDados(),
-    h("h2", {}, `Skills (${(f.skills || []).length})`),
-    listaSkills(f, "proprio", "eu"));
+    seletorQuemVe(),
+    formAberto.has("nova") ? formularioSkill(f, null) : h("button", { onclick: () => abrirFormSkill(f, null) }, "＋ Nova skill"),
+    h("div", { style: { height: "10px" } }),
+    listaSkills(f, "proprio", "eu"),
+    fora ? h("p", { class: "nota" }, `${fora} skill${fora > 1 ? "s" : ""} fora da lista. `, h("button", { class: "link", onclick: restaurarOcultas }, "Mostrar de novo")) : null);
 }
 
 function painelFicha() {
   const f = estado.ficha;
   const entrada = novaEntradaArquivo();
   if (!f) return painelSemFicha();
-  const quando = f.geradoEm ? new Date(f.geradoEm).toLocaleString("pt-BR") : "";
   return h("div", {},
     (f.v || 1) < 3 ? h("p", { class: "nota alerta" }, "Esta ficha foi baixada numa versão antiga: faltam descrições inteiras, dados ou o custo automático das skills. Baixe de novo no site (botão Owlbear) e use Atualizar abaixo.") : null,
-    painelDados(),
     fichaView(f, "proprio", "eu", mudarRecurso(f)),
+    estado.publicacao.startsWith("Não") ? h("p", { class: "nota alerta" }, estado.publicacao) : null,   // só avisa quando falha
     h("div", { class: "linha", style: { marginTop: "14px" } },
       h("button", { onclick: () => entrada.click() }, "Atualizar (importar de novo)"),
       h("button", { onclick: retirarFicha }, "Remover")),
-    h("p", { class: "nota" }, quando ? `Arquivo gerado em ${quando}. Os ajustes de recurso valem na mesa (o mestre também pode mexer neles).` : ""),
-    estado.publicacao ? h("p", { class: "nota " + (estado.publicacao.startsWith("Não") ? "alerta" : "ok") }, estado.publicacao) : null,
     entrada);
 }
 
@@ -741,7 +806,9 @@ async function desenhar() {
       h("span", { class: "titulo" }, JANELAS[JANELA].titulo),
       h("div", { class: "fim" }, botoesZoom(), h("button", { title: "Fechar esta janela", onclick: () => OBR.popover.close(ID_POP) }, "×")),
     ] : [
-      ...["ficha", "recursos", "skills", "iniciativa", ...(estado.souGM ? ["mesa"] : [])].map(a => h("button", { class: "aba", role: "tab", "aria-selected": String(a === atual), onclick: () => { abaAtual = a; guardar("senshi/aba", a); redesenhar(); } }, JANELAS[a].titulo)),
+      ...["ficha", "recursos", "skills", "iniciativa", ...(estado.souGM ? ["mesa"] : [])].map(a => a === "recursos"
+        ? h("button", { class: "aba", title: "Abre uma janela pequena de recursos, fixa na tela", onclick: () => abrirJanela("recursos") }, "Recursos ↗")
+        : h("button", { class: "aba", role: "tab", "aria-selected": String(a === atual), onclick: () => { abaAtual = a; guardar("senshi/aba", a); redesenhar(); } }, JANELAS[a].titulo)),
       h("div", { class: "fim" }, botoesZoom(), h("button", { title: "Abrir esta aba em uma janela separada", onclick: () => abrirJanela(atual) }, "↗")),
     ]));
     main.replaceChildren(conteudo);
@@ -777,7 +844,7 @@ OBR.onReady(async () => {
   // o fundo muda a ficha quando o mestre ajusta um recurso: acompanha a cópia local
   window.addEventListener("storage", e => { if (e.key === LOCAL) { estado.ficha = ler(LOCAL); redesenhar(); } });
 
-  if (!estado.souGM && abaAtual === "mesa") abaAtual = "ficha";
+  if ((!estado.souGM && abaAtual === "mesa") || abaAtual === "recursos") abaAtual = "ficha";
   escutarDicePlus();
   aplicarZoom(ler(CHAVE_ZOOM) || 1);
   instalarAlca();
