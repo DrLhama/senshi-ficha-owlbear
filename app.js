@@ -1,7 +1,7 @@
-import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo } from "./shared.js?v=7";
+import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo } from "./shared.js?v=8";
 
 // Número da versão: vai nos endereços das janelas (o navegador baixa o arquivo novo) e aparece no painel Senshi.
-const VERSAO = "7";
+const VERSAO = "8";
 
 const params = new URLSearchParams(location.search);
 const JANELA = params.get("janela");        // null = painel com abas; senão: ficha | iniciativa | mesa | jogador
@@ -717,7 +717,7 @@ function painelHub() {
       lanca("iniciativa", "Iniciativa", "Turnos e ciclos"),
       estado.souGM ? lanca("mesa", "Mesa", "Fichas dos jogadores") : null),
     f ? null : h("div", { style: { marginTop: "12px" } }, painelSemFicha()),
-    f && (f.v || 1) < 3 ? h("p", { class: "nota alerta" }, "Esta ficha foi baixada numa versão antiga: faltam descrições inteiras, dados ou o custo automático das skills. Baixe de novo no site (botão Owlbear) e use Atualizar abaixo.") : null,
+    f && (f.v || 1) < 4 ? h("p", { class: "nota alerta" }, "Este arquivo foi gerado por uma versão antiga do site e pode trazer skills de outra raça, sem custo automático ou cortadas. Atualize o site (Fichas Locais: rode o Atualizar), baixe a ficha de novo pelo botão Owlbear e use Atualizar ficha.") : null,
     estado.publicacao.startsWith("Não") ? h("p", { class: "nota alerta" }, estado.publicacao) : null,   // só avisa quando falha
     f ? h("div", { class: "linha", style: { marginTop: "12px" } },
       h("button", { onclick: () => entrada.click() }, "Atualizar ficha"),
