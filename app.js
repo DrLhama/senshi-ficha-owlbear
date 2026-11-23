@@ -37,7 +37,7 @@ const INI_VAZIA = () => ({ ativo: false, combatentes: [], vez: null, turnosPorCi
 
 // ── abrir janelas separadas ───────────────────────────────────
 const JANELAS = {
-  ficha: { titulo: "Ficha", w: 400, h: 660 },
+  ficha: { titulo: "Ficha", w: 360, h: 400 },
   recursos: { titulo: "Recursos", w: 320, h: 200 },
   skills: { titulo: "Skills", w: 420, h: 640 },
   iniciativa: { titulo: "Iniciativa", w: 360, h: 560 },
@@ -93,28 +93,91 @@ function instalarAlca() {
   });
 }
 
-/** Arrastar a barra do título: ao soltar, a janela reabre no novo lugar. */
+const ARRASTO = params.get("arrasto") === "1";
+const CHAVE_FALHAS_ARRASTO = "senshi/arrasto-falhas";
+const arrastoAoVivoFalhou = () => (ler(CHAVE_FALHAS_ARRASTO) || 0) >= 2;
+
+/** O Owlbear não move janelas de extensão. Então, ao começar a arrastar, a janela dá lugar a uma moldura
+ *  transparente do tamanho da tela, onde um contorno acompanha o mouse ao vivo; ao soltar, a janela reabre ali. */
+async function iniciarArrasto(g, cx, cy) {
+  const largura = await OBR.viewport.getWidth(), altura = await OBR.viewport.getHeight();
+  const url = new URL("app.html", location.href);
+  const dados = { arrasto: "1", janela: JANELA, id: ID_POP, jogador: ALVO || "", left: g.left, top: g.top, w: window.innerWidth, h: window.innerHeight, ox: cx, oy: cy };
+  for (const [k, v] of Object.entries(dados)) if (v !== "") url.searchParams.set(k, v);
+  await OBR.popover.close(ID_POP);
+  await OBR.popover.open({
+    id: ID_POP + "-arrasto", url: url.toString(), width: largura, height: altura,
+    anchorReference: "POSITION", anchorPosition: { left: 0, top: 0 },
+    anchorOrigin: { horizontal: "LEFT", vertical: "TOP" }, transformOrigin: { horizontal: "LEFT", vertical: "TOP" },
+    hidePaper: true, disableClickAway: true, marginThreshold: 0,
+  });
+}
+
 function instalarArraste() {
   const barra = $("#topo");
   barra.style.cursor = "move";
   barra.title = "Arraste para mover a janela";
   barra.addEventListener("pointerdown", e => {
-    if (e.target.closest("button")) return;
+    if (e.target.closest("button") || e.button !== 0) return;
     const g = geomSalva(JANELA);
     if (typeof g?.left !== "number" || typeof g?.top !== "number") return;
+    const x0 = e.clientX, y0 = e.clientY, sx0 = e.screenX, sy0 = e.screenY;
     barra.setPointerCapture(e.pointerId);
-    const x0 = e.screenX, y0 = e.screenY;
-    const soltar = async ev => {
-      barra.removeEventListener("pointerup", soltar);
-      const dx = ev.screenX - x0, dy = ev.screenY - y0;
+    let comecou = false;
+    const limpar = () => { barra.removeEventListener("pointermove", mexer); barra.removeEventListener("pointerup", soltar); };
+    function mexer(ev) {
+      if (comecou || Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 6) return;
+      comecou = true;
+      if (arrastoAoVivoFalhou()) return;                 // plano B: move só ao soltar
+      limpar();
+      iniciarArrasto(g, ev.clientX, ev.clientY);
+    }
+    async function soltar(ev) {
+      limpar();
+      const dx = ev.screenX - sx0, dy = ev.screenY - sy0;
       if (Math.abs(dx) + Math.abs(dy) < 6) return;
       const largura = await OBR.viewport.getWidth(), altura = await OBR.viewport.getHeight();
       const geom = { left: limitar(g.left + dx, 0, largura - 80), top: limitar(g.top + dy, 0, altura - 60), w: window.innerWidth, h: window.innerHeight };
       await OBR.popover.close(ID_POP);
       await abrirJanela(JANELA, { jogador: ALVO || undefined, geom });
-    };
+    }
+    barra.addEventListener("pointermove", mexer);
     barra.addEventListener("pointerup", soltar);
   });
+}
+
+/** A moldura do arrasto: um contorno segue o mouse ao vivo e, ao soltar, a janela real reabre no lugar. */
+function modoArrasto() {
+  const n = k => Number(params.get(k)) || 0;
+  const g = { left: n("left"), top: n("top"), w: n("w"), h: n("h") }, ox = n("ox"), oy = n("oy");
+  document.documentElement.style.background = "transparent";
+  document.body.style.background = "transparent";
+  $("#topo").remove(); $("#main").remove();
+  const fantasma = h("div", { class: "fantasma", style: { left: g.left + "px", top: g.top + "px", width: g.w + "px", height: g.h + "px" } }, h("span", {}, JANELAS[JANELA]?.titulo || ""));
+  fantasma.style.setProperty("--tema", ler(LOCAL)?.cores?.tema || "#9a9aa4");
+  document.body.append(fantasma);
+  let movido = false, acabou = false, atual = { left: g.left, top: g.top };
+  async function terminar(cancelar) {
+    if (acabou) return;
+    acabou = true;
+    if (movido) guardar(CHAVE_FALHAS_ARRASTO, 0);
+    else if (!cancelar) guardar(CHAVE_FALHAS_ARRASTO, (ler(CHAVE_FALHAS_ARRASTO) || 0) + 1);   // o mouse não chegou aqui: depois de 2 vezes, usa o arrasto simples
+    const final = cancelar ? { left: g.left, top: g.top } : atual;
+    await OBR.popover.close(ID_POP + "-arrasto");
+    await abrirJanela(JANELA, { jogador: params.get("jogador") || undefined, geom: { left: final.left, top: final.top, w: g.w, h: g.h } });
+  }
+  window.addEventListener("pointermove", e => {
+    if (acabou) return;
+    if (e.buttons & 1) {
+      movido = true;
+      atual = { left: limitar(e.clientX - ox, 0, window.innerWidth - 80), top: limitar(e.clientY - oy, 0, window.innerHeight - 60) };
+      fantasma.style.left = atual.left + "px";
+      fantasma.style.top = atual.top + "px";
+    } else if (movido) terminar(false);                 // soltou o botão
+  });
+  window.addEventListener("pointerup", () => terminar(false));
+  window.addEventListener("keydown", e => { if (e.key === "Escape") terminar(true); });
+  setTimeout(() => { if (!movido) terminar(false); }, 1800);   // rede de segurança: a moldura nunca fica presa na tela
 }
 
 // Letra maior ou menor, só neste navegador.
@@ -525,13 +588,18 @@ function listaSkills(f, modo, chave) {
   return skillsVisiveis(f, modo).map(s => skillEl(s, `${chave}:s:${s.nome}${(vistos[s.nome] = (vistos[s.nome] || 0) + 1) > 1 ? "#" + vistos[s.nome] : ""}`, modo === "proprio", f));
 }
 
+const cabecalhoFicha = f => h("div", { class: "cab" }, h("strong", {}, f.nome), h("span", { class: "mudo" }, `Nível ${f.nivel}${f.origem ? " · " + f.origem : ""}`));
+const blocoAtributos = f => [
+  h("div", { class: "attrs" }, f.atributos.map(a => h("div", { class: "attr", style: { borderLeftColor: a.cor } }, h("small", {}, `${a.nome} · ${a.dado}`), h("b", {}, a.valor)))),
+  f.secundarios?.length ? [h("h2", {}, "Secundários"), h("div", { class: "chips" }, f.secundarios.map(s => chip(s.nome, s.valor)))] : null,
+];
+
 function fichaView(f, modo, chave, aoMudar) {
   return comTema(f,
-    h("div", { class: "cab" }, h("strong", {}, f.nome), h("span", { class: "mudo" }, `Nível ${f.nivel}${f.origem ? " · " + f.origem : ""}`)),
+    cabecalhoFicha(f),
     secaoRecursos(f, modo, chave, aoMudar),
     h("h2", {}, "Atributos"),
-    h("div", { class: "attrs" }, f.atributos.map(a => h("div", { class: "attr", style: { borderLeftColor: a.cor } }, h("small", {}, `${a.nome} · ${a.dado}`), h("b", {}, a.valor)))),
-    f.secundarios?.length ? [h("h2", {}, "Secundários"), h("div", { class: "chips" }, f.secundarios.map(s => chip(s.nome, s.valor)))] : null,
+    blocoAtributos(f),
     h("h2", {}, `Skills (${skillsVisiveis(f, modo).length})`),
     listaSkills(f, modo, chave));
 }
@@ -626,17 +694,32 @@ function painelSkills() {
     fora ? h("p", { class: "nota" }, `${fora} skill${fora > 1 ? "s" : ""} fora da lista. `, h("button", { class: "link", onclick: restaurarOcultas }, "Mostrar de novo")) : null);
 }
 
-function painelFicha() {
+/** A janela da Ficha: só os atributos. */
+function painelAtributos() {
+  const f = estado.ficha;
+  if (!f) return painelSemFicha();
+  return comTema(f, cabecalhoFicha(f), blocoAtributos(f));
+}
+
+/** O painel do botão da barra lateral: abre cada parte numa janela fixa na tela e cuida do arquivo da ficha. */
+function painelHub() {
   const f = estado.ficha;
   const entrada = novaEntradaArquivo();
-  if (!f) return painelSemFicha();
+  const lanca = (nome, rotulo, dica) => h("button", { class: "lanca", title: "Abre uma janela fixa na tela", onclick: () => abrirJanela(nome) }, h("b", {}, rotulo), h("small", {}, dica));
   return h("div", {},
-    (f.v || 1) < 3 ? h("p", { class: "nota alerta" }, "Esta ficha foi baixada numa versão antiga: faltam descrições inteiras, dados ou o custo automático das skills. Baixe de novo no site (botão Owlbear) e use Atualizar abaixo.") : null,
-    fichaView(f, "proprio", "eu", mudarRecurso(f)),
+    f ? comTema(f, cabecalhoFicha(f)) : null,
+    h("div", { class: "lancador" },
+      lanca("ficha", "Ficha", "Atributos"),
+      lanca("recursos", "Recursos", "Vida, mana…"),
+      lanca("skills", "Skills", "Usar e rolar"),
+      lanca("iniciativa", "Iniciativa", "Turnos e ciclos"),
+      estado.souGM ? lanca("mesa", "Mesa", "Fichas dos jogadores") : null),
+    f ? null : h("div", { style: { marginTop: "12px" } }, painelSemFicha()),
+    f && (f.v || 1) < 3 ? h("p", { class: "nota alerta" }, "Esta ficha foi baixada numa versão antiga: faltam descrições inteiras, dados ou o custo automático das skills. Baixe de novo no site (botão Owlbear) e use Atualizar abaixo.") : null,
     estado.publicacao.startsWith("Não") ? h("p", { class: "nota alerta" }, estado.publicacao) : null,   // só avisa quando falha
-    h("div", { class: "linha", style: { marginTop: "14px" } },
-      h("button", { onclick: () => entrada.click() }, "Atualizar (importar de novo)"),
-      h("button", { onclick: retirarFicha }, "Remover")),
+    f ? h("div", { class: "linha", style: { marginTop: "12px" } },
+      h("button", { onclick: () => entrada.click() }, "Atualizar ficha"),
+      h("button", { onclick: retirarFicha }, "Remover")) : null,
     entrada);
 }
 
@@ -788,14 +871,14 @@ function painelIniciativaJogador() {
 const painelIniciativa = () => estado.souGM ? painelIniciativaMestre() : painelIniciativaJogador();
 
 // ── montagem da tela ──────────────────────────────────────────
-const PAINEIS = { ficha: painelFicha, recursos: painelRecursos, skills: painelSkills, iniciativa: painelIniciativa, mesa: painelMesa, jogador: painelJogador };
+const PAINEIS = { hub: painelHub, ficha: painelAtributos, recursos: painelRecursos, skills: painelSkills, iniciativa: painelIniciativa, mesa: painelMesa, jogador: painelJogador };
 let desenhando = false, pendente = false;
 
 async function desenhar() {
   if (desenhando) { pendente = true; return; }
   desenhando = true;
   try {
-    const atual = JANELA || abaAtual;
+    const atual = JANELA || "hub";
     const main = $("#main");
     const foco = document.activeElement?.dataset?.foco;
     const sel = foco ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
@@ -806,10 +889,8 @@ async function desenhar() {
       h("span", { class: "titulo" }, JANELAS[JANELA].titulo),
       h("div", { class: "fim" }, botoesZoom(), h("button", { title: "Fechar esta janela", onclick: () => OBR.popover.close(ID_POP) }, "×")),
     ] : [
-      ...["ficha", "recursos", "skills", "iniciativa", ...(estado.souGM ? ["mesa"] : [])].map(a => a === "recursos"
-        ? h("button", { class: "aba", title: "Abre uma janela pequena de recursos, fixa na tela", onclick: () => abrirJanela("recursos") }, "Recursos ↗")
-        : h("button", { class: "aba", role: "tab", "aria-selected": String(a === atual), onclick: () => { abaAtual = a; guardar("senshi/aba", a); redesenhar(); } }, JANELAS[a].titulo)),
-      h("div", { class: "fim" }, botoesZoom(), h("button", { title: "Abrir esta aba em uma janela separada", onclick: () => abrirJanela(atual) }, "↗")),
+      h("span", { class: "titulo" }, "Senshi"),
+      h("div", { class: "fim" }, botoesZoom()),
     ]));
     main.replaceChildren(conteudo);
     main.scrollTop = rolagem;
@@ -828,6 +909,7 @@ function $(sel) { return document.querySelector(sel); }
 
 // ── início ────────────────────────────────────────────────────
 OBR.onReady(async () => {
+  if (ARRASTO) return modoArrasto();
   estado.meuId = OBR.player.id;
   estado.souGM = (await OBR.player.getRole()) === "GM";
   const meta = await OBR.player.getMetadata();
@@ -844,7 +926,7 @@ OBR.onReady(async () => {
   // o fundo muda a ficha quando o mestre ajusta um recurso: acompanha a cópia local
   window.addEventListener("storage", e => { if (e.key === LOCAL) { estado.ficha = ler(LOCAL); redesenhar(); } });
 
-  if ((!estado.souGM && abaAtual === "mesa") || abaAtual === "recursos") abaAtual = "ficha";
+  if (!JANELA) OBR.action.setHeight(estado.souGM ? 470 : 410).catch(() => {});
   escutarDicePlus();
   aplicarZoom(ler(CHAVE_ZOOM) || 1);
   instalarAlca();
