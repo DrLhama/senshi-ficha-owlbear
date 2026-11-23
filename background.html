@@ -4,7 +4,7 @@
 <script type="module">
   // Fica ligado mesmo com o painel fechado: aplica na ficha do jogador o ajuste de recurso
   // pedido pelo mestre e republica a ficha para a mesa.
-  import { OBR, CANAL_AJUSTE, LOCAL, ler, guardar, publicarFicha, aplicarExpressao } from "./shared.js";
+  import { OBR, CANAL_AJUSTE, LOCAL, ler, guardar, publicarFicha, aplicarExpressao } from "./shared.js?v=7";
   OBR.onReady(() => {
     OBR.broadcast.onMessage(CANAL_AJUSTE, async ({ data }) => {
       if (!data || data.para !== OBR.player.id) return;

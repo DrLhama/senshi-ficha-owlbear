@@ -1,16 +1,16 @@
 {
     "name":  "Senshi · Ficha e Iniciativa",
-    "version":  "2.0.0",
+    "version":  "2.1.0",
     "manifest_version":  1,
     "description":  "A ficha do jogador sempre à vista, painel do mestre e iniciativa com ciclos e turnos.",
     "author":  "Mesa Odisseia",
     "homepage_url":  "https://drlhama.github.io/senshi-ficha-owlbear/",
     "icon":  "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg",
-    "background_url":  "https://drlhama.github.io/senshi-ficha-owlbear/background.html",
+    "background_url":  "https://drlhama.github.io/senshi-ficha-owlbear/background.html?v=7",
     "action":  {
                    "title":  "Senshi",
                    "icon":  "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg",
-                   "popover":  "https://drlhama.github.io/senshi-ficha-owlbear/app.html",
+                   "popover":  "https://drlhama.github.io/senshi-ficha-owlbear/app.html?v=7",
                    "width":  400,
                    "height":  660
                }

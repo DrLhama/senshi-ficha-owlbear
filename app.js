@@ -1,4 +1,7 @@
-import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo } from "./shared.js";
+import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo } from "./shared.js?v=7";
+
+// Número da versão: vai nos endereços das janelas (o navegador baixa o arquivo novo) e aparece no painel Senshi.
+const VERSAO = "7";
 
 const params = new URLSearchParams(location.search);
 const JANELA = params.get("janela");        // null = painel com abas; senão: ficha | iniciativa | mesa | jogador
@@ -59,6 +62,7 @@ async function abrirJanela(nome, extra = {}) {
   guardarGeom(nome, g);
   const id = `senshi-${nome}${extra.jogador ? "-" + extra.jogador : ""}`;
   const url = new URL("app.html", location.href);
+  url.searchParams.set("v", VERSAO);
   url.searchParams.set("janela", nome);
   url.searchParams.set("id", id);
   if (extra.jogador) url.searchParams.set("jogador", extra.jogador);
@@ -102,7 +106,7 @@ const arrastoAoVivoFalhou = () => (ler(CHAVE_FALHAS_ARRASTO) || 0) >= 2;
 async function iniciarArrasto(g, cx, cy) {
   const largura = await OBR.viewport.getWidth(), altura = await OBR.viewport.getHeight();
   const url = new URL("app.html", location.href);
-  const dados = { arrasto: "1", janela: JANELA, id: ID_POP, jogador: ALVO || "", left: g.left, top: g.top, w: window.innerWidth, h: window.innerHeight, ox: cx, oy: cy };
+  const dados = { v: VERSAO, arrasto: "1", janela: JANELA, id: ID_POP, jogador: ALVO || "", left: g.left, top: g.top, w: window.innerWidth, h: window.innerHeight, ox: cx, oy: cy };
   for (const [k, v] of Object.entries(dados)) if (v !== "") url.searchParams.set(k, v);
   await OBR.popover.close(ID_POP);
   await OBR.popover.open({
@@ -718,6 +722,7 @@ function painelHub() {
     f ? h("div", { class: "linha", style: { marginTop: "12px" } },
       h("button", { onclick: () => entrada.click() }, "Atualizar ficha"),
       h("button", { onclick: retirarFicha }, "Remover")) : null,
+    h("p", { class: "nota", style: { marginTop: "14px" } }, `versão ${VERSAO}`),
     entrada);
 }
 
