@@ -685,8 +685,6 @@ function painelSkills() {
   if (!f) return painelSemFicha();
   const fora = (f.skills || []).length - skillsVisiveis(f, "proprio").length;
   return comTema(f,
-    // os recursos ficam à vista aqui em cima: dá para ver o custo saindo ao usar uma skill
-    h("div", { class: "tira" }, secaoRecursos(f, "proprio", "sk", mudarRecurso(f))),
     seletorQuemVe(),
     formAberto.has("nova") ? formularioSkill(f, null) : h("button", { onclick: () => abrirFormSkill(f, null) }, "＋ Nova skill"),
     h("div", { style: { height: "10px" } }),
