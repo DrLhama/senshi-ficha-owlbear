@@ -59,6 +59,26 @@ export function aplicarExpressao(atual, max, texto) {
   return Math.max(0, Math.min(max, Math.round(novo)));
 }
 
+/** Combo de dados da skill: "1d20+5 #Ataque, 2d8 #Dano" -> [{ notacao, rotulo }] (mesma regra do editor no site). */
+export function lerCombo(texto) {
+  return String(texto || "").split(",").map(p => p.trim()).filter(Boolean).map(p => {
+    const m = /^(.*?)\s*#\s*(.+)$/.exec(p);
+    return m ? { notacao: m[1].trim(), rotulo: m[2].trim() } : { notacao: p, rotulo: "" };
+  });
+}
+
+/** Visuais prontos para os dados do Dice+ (só os campos livres do material padrão). */
+export const VISUAIS_DADOS = {
+  ficha: { nome: "Cor da minha ficha" },
+  obsidiana: { nome: "Obsidiana", color: "#15151d", numberColor: "#e8c36a", metalness: 0.65, roughness: 0.22, sheen: 0.4 },
+  ouro: { nome: "Ouro", color: "#c9a24b", numberColor: "#1a1208", metalness: 0.95, roughness: 0.18 },
+  marfim: { nome: "Marfim", color: "#e9e2cf", numberColor: "#3a2d1c", metalness: 0, roughness: 0.55 },
+  sangue: { nome: "Sangue", color: "#7a1620", numberColor: "#ffe9e9", metalness: 0.2, roughness: 0.3, sheen: 0.6 },
+  esmeralda: { nome: "Esmeralda", color: "#1d6b4d", numberColor: "#eafff3", metalness: 0.3, roughness: 0.2, sheen: 0.5 },
+  gelo: { nome: "Gelo", color: "#9fd4ff", numberColor: "#07263f", opacity: 0.78, roughness: 0.08, metalness: 0.1 },
+  noite: { nome: "Noite estrelada", color: "#2b2466", numberColor: "#f6e9ff", metalness: 0.5, roughness: 0.25, sheen: 0.7, font: "aelfa" },
+};
+
 export const cabecalhoDe = meta => meta?.[CHAVE] || null;
 
 /** Remonta a ficha completa a partir dos metadados de um jogador. */

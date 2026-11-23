@@ -1,4 +1,4 @@
-import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao } from "./shared.js";
+import { OBR, CHAVE, LOCAL, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, publicarFicha, cabecalhoDe, lerFicha, guardar, ler, aplicarExpressao, lerCombo, VISUAIS_DADOS } from "./shared.js";
 
 const params = new URLSearchParams(location.search);
 const JANELA = params.get("janela");        // null = painel com abas; senão: ficha | iniciativa | mesa | jogador
@@ -38,6 +38,8 @@ const INI_VAZIA = () => ({ ativo: false, combatentes: [], vez: null, turnosPorCi
 // ── abrir janelas separadas ───────────────────────────────────
 const JANELAS = {
   ficha: { titulo: "Ficha", w: 400, h: 660 },
+  recursos: { titulo: "Recursos", w: 340, h: 280 },
+  skills: { titulo: "Skills", w: 420, h: 640 },
   iniciativa: { titulo: "Iniciativa", w: 360, h: 560 },
   mesa: { titulo: "Mesa", w: 420, h: 660 },
   jogador: { titulo: "Ficha do jogador", w: 420, h: 660 },
@@ -51,7 +53,7 @@ const limitar = (v, min, max) => Math.max(min, Math.min(max, v));
 async function abrirJanela(nome, extra = {}) {
   const cfg = JANELAS[nome];
   const largura = await OBR.viewport.getWidth();
-  const padrao = { left: { ficha: 16, iniciativa: Math.max(16, (largura - cfg.w) / 2), mesa: Math.max(16, largura - cfg.w - 16), jogador: Math.max(16, largura - cfg.w - 60) }[nome], top: 70, w: cfg.w, h: cfg.h };
+  const padrao = { left: { ficha: 16, recursos: 16, skills: 372, iniciativa: Math.max(16, (largura - cfg.w) / 2), mesa: Math.max(16, largura - cfg.w - 16), jogador: Math.max(16, largura - cfg.w - 60) }[nome], top: 70, w: cfg.w, h: cfg.h };
   const g = { ...padrao, ...geomSalva(nome), ...extra.geom };
   guardarGeom(nome, g);
   const id = `senshi-${nome}${extra.jogador ? "-" + extra.jogador : ""}`;
@@ -150,10 +152,21 @@ function campo(chave, props = {}) {
 }
 
 // ── skills ────────────────────────────────────────────────────
+/** Cada linha do combo vira um botão para rolar só ela (sem pagar custo). O botão Usar rola o combo inteiro. */
+function linhasDoCombo(m, chave) {
+  const linhas = lerCombo(m.rolagem);
+  if (linhas.length < 2) return null;
+  return h("div", { class: "combo" }, linhas.map(l => h("button", {
+    class: "rolar", title: `Rolar só esta linha: ${l.notacao}`,
+    onclick: () => rolarSkill(l.rotulo ? `${l.notacao} #${l.rotulo}` : l.notacao, chave),
+  }, h("b", {}, l.rotulo || "Dado"), " ", l.notacao)));
+}
+
 function blocoModo(m, descSkill, jaNoResumo, rolar) {
   const extra = [m.resumo, m.desc].find(t => t && t !== descSkill);
   return [
     rolar ? h("div", { class: "linha", style: { margin: "6px 0" } }, botaoUsar(rolar.f, rolar.s, rolar.i, rolar.chave)) : null,
+    rolar ? linhasDoCombo(m, rolar.chave) : null,
     rolar ? resultadoRolagem(rolar.chave) : null,
     (!jaNoResumo && (m.acoes?.length || m.custos?.length) || m.pecas?.length) ? h("div", { class: "chips", style: { margin: "4px 0" } },
       !jaNoResumo && (m.acoes || []).map(a => chip("", a)),
@@ -205,6 +218,7 @@ async function rolarSkill(notacao, chave) {
   await OBR.broadcast.sendMessage("dice-plus/roll-request", {
     rollId, playerId: OBR.player.id, playerName: await OBR.player.getName(),
     rollTarget: ler(CHAVE_ALVO) || "everyone", diceNotation: notacao, showResults: true, timestamp: Date.now(), source: SOURCE,
+    dice: { default: estiloDados() },                      // visual dos dados (vale onde o saco do jogador não tem dado daquele tipo)
   }, { destination: "ALL" });
 }
 
@@ -349,22 +363,37 @@ function skillEl(s, chave, editavel, f) {
   const iResumo = !editavel || !modos.length ? -1
     : s.ligada ? Math.min(modoLigadoDe(s), modos.length - 1)
     : Math.max(0, modos.findIndex(m => m.rolagem || m.uso?.deltas?.length));
+  const estaLigadaNaLista = s.tipo === "ativa" && !!s.ligada;
   const podeDesligar = editavel && s.tipo === "ativa" && s.ligada && !modos[iResumo]?.uso?.unico;
   const resumo = h("div", {},
-    h("div", { class: "res" }, h("span", { class: s.ligada ? "on" : "" }, s.nome),
+    h("div", { class: "res" }, h("span", { class: "nome-skill" }, s.nome),
       h("span", { class: "linha" },
         iResumo >= 0 ? botaoUsar(f, s, iResumo, `${chave}:m${iResumo}`) : null,
         podeDesligar ? h("button", { class: "rolar", title: "Desliga a skill (o custo já pago não volta)", onclick: e => { e.preventDefault(); e.stopPropagation(); desligarSkill(f, s); } }, "Desligar") : null,
-        h("span", { class: "mudo" }, s.tipo + (s.ligada && s.tipo !== "passiva" ? " · ligada" : "")))),
+        estaLigadaNaLista ? h("span", { class: "selo-ligada" }, "LIGADA") : null,
+        h("span", { class: "mudo" }, s.tipo))),
     iResumo >= 0 ? resultadoRolagem(`${chave}:ult`) : null,
     chips.flat(Infinity).some(Boolean) ? h("div", { class: "chips" }, chips) : null);
-  return details(chave, resumo, corpo, "skill");
+  const el = details(chave, resumo, corpo, "skill");
+  if (estaLigadaNaLista) el.dataset.ligada = "";
+  return el;
 }
 
 // ── ficha ─────────────────────────────────────────────────────
 /** modo: "proprio" (ajusta a ficha local) | "mestre" (pede ao jogador) | "leitura". */
-function barra(rc, modo, aoMudar) {
+const ultimoValor = new Map();      // recurso -> valor da última tela, para perceber o que mudou
+const mudancas = new Map();         // recurso -> { delta, desde }: o aviso de "−20" dura ~2 s mesmo que a tela redesenhe
+const DURACAO_AVISO = 2200;
+
+function barra(rc, modo, aoMudar, id) {
   const pct = rc.max > 0 ? Math.max(0, Math.min(100, (rc.atual / rc.max) * 100)) : 0;
+  const antes = ultimoValor.get(id);
+  ultimoValor.set(id, rc.atual);
+  if (antes !== undefined && antes !== rc.atual) mudancas.set(id, { delta: rc.atual - antes, desde: Date.now() });
+  const mudou = mudancas.get(id);
+  const passou = mudou ? Date.now() - mudou.desde : Infinity;
+  const aviso = mudou && passou < DURACAO_AVISO ? mudou : null;
+  const sentido = aviso ? (aviso.delta < 0 ? "perde" : "ganha") : null;
   // aoMudar recebe o texto digitado (25, +25, -25, -50%…): quem interpreta é aplicarExpressao
   const passo = (e, sinal) => aoMudar(rc, (sinal < 0 ? "-" : "+") + (e.shiftKey ? 10 : 1));
   const aplicar = campo => { const t = campo.value.trim(); if (t && t !== String(rc.atual)) aoMudar(rc, t); else campo.value = rc.atual; };
@@ -376,34 +405,47 @@ function barra(rc, modo, aoMudar) {
     onkeydown: e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { e.target.value = rc.atual; e.target.blur(); } },
     onblur: e => aplicar(e.target),
   }) : null;
+  if (num && sentido) num.classList.add("mudou-" + sentido);
+  // o aviso entra já no ponto da animação em que estava, para não recomeçar a cada redesenho
+  const atraso = aviso ? { animationDelay: `-${passou}ms` } : {};
   return h("div", { class: "barra" },
     h("div", { class: "topo2" },
       h("span", {}, rc.nome),
       h("span", { class: "ajuste" },
+        aviso ? h("span", { class: "delta " + sentido, style: atraso }, `${aviso.delta > 0 ? "+" : "−"}${Math.abs(aviso.delta)}`) : null,
         modo !== "leitura" && h("button", { onclick: e => passo(e, -1), "aria-label": `Diminuir ${rc.nome}` }, "−"),
         num || h("b", {}, rc.atual), h("span", { class: "mudo" }, `/ ${rc.max}`),
         modo !== "leitura" && h("button", { onclick: e => passo(e, 1), "aria-label": `Aumentar ${rc.nome}` }, "+"))),
-    h("div", { class: "trilho" }, h("div", { class: "enche", style: { width: pct + "%", background: rc.cor || "var(--tema)" } })));
+    h("div", { class: "trilho" }, h("div", { class: "enche " + (sentido || ""), style: { width: pct + "%", background: rc.cor || "var(--tema)", ...atraso } })));
 }
 
-function fichaView(f, modo, chave, aoMudar) {
-  const raiz = h("div");
+/** Recipiente com as cores da ficha como variáveis (o tema do jogador vale em cada janela). */
+function comTema(f, ...filhos) {
+  const raiz = h("div", {}, ...filhos);
   raiz.style.setProperty("--tema", f.cores.tema);
   raiz.style.setProperty("--sec", f.cores.secundaria);
   raiz.style.setProperty("--ter", f.cores.terciaria);
-  const skills = [...(f.skills || [])].sort((a, b) => Number(b.ligada) - Number(a.ligada));
-  const vistos = {};                                   // a chave usa o nome, não a posição: ligar uma skill reordena a lista
-  raiz.append(...[
+  return raiz;
+}
+
+const secaoRecursos = (f, modo, chave, aoMudar) => f.recursos.map(rc => barra(rc, modo, aoMudar, `${chave}:${rc.id}`));
+
+/** As skills ficam na ordem da ficha: ligar uma não a muda de lugar. A chave usa o nome, não a posição. */
+function listaSkills(f, modo, chave) {
+  const vistos = {};
+  return (f.skills || []).map(s => skillEl(s, `${chave}:s:${s.nome}${(vistos[s.nome] = (vistos[s.nome] || 0) + 1) > 1 ? "#" + vistos[s.nome] : ""}`, modo === "proprio", f));
+}
+
+function fichaView(f, modo, chave, aoMudar) {
+  return comTema(f,
     h("div", { class: "cab" }, h("strong", {}, f.nome), h("span", { class: "mudo" }, `Nível ${f.nivel}${f.origem ? " · " + f.origem : ""}`)),
     h("h2", {}, "Recursos"),
-    f.recursos.map(rc => barra(rc, modo, aoMudar)),
+    secaoRecursos(f, modo, chave, aoMudar),
     h("h2", {}, "Atributos"),
     h("div", { class: "attrs" }, f.atributos.map(a => h("div", { class: "attr", style: { borderLeftColor: a.cor } }, h("small", {}, `${a.nome} · ${a.dado}`), h("b", {}, a.valor)))),
     f.secundarios?.length ? [h("h2", {}, "Secundários"), h("div", { class: "chips" }, f.secundarios.map(s => chip(s.nome, s.valor)))] : null,
-    h("h2", {}, `Skills (${skills.length})`),
-    skills.map(s => skillEl(s, `${chave}:s:${s.nome}${(vistos[s.nome] = (vistos[s.nome] || 0) + 1) > 1 ? "#" + vistos[s.nome] : ""}`, modo === "proprio", f)),
-  ].flat(Infinity).filter(Boolean));
-  return raiz;
+    h("h2", {}, `Skills (${(f.skills || []).length})`),
+    listaSkills(f, modo, chave));
 }
 
 async function aplicarMinhaFicha(f) {
@@ -437,25 +479,94 @@ async function retirarFicha() {
   redesenhar();
 }
 
+const novaEntradaArquivo = () => h("input", { type: "file", accept: ".json,application/json", class: "oculto", onchange: e => { if (e.target.files[0]) importarArquivo(e.target.files[0]); } });
+
+function painelSemFicha() {
+  const entrada = novaEntradaArquivo();
+  const caixa = h("div", { class: "vazio" },
+    h("p", {}, "Nenhuma ficha importada."),
+    h("p", { class: "mudo" }, "No site, abra sua ficha e toque em ", h("b", {}, "Owlbear"), " para baixar o arquivo. Depois solte aqui ou escolha o arquivo."),
+    h("button", { onclick: () => entrada.click() }, "Importar ficha"));
+  caixa.addEventListener("dragover", e => { e.preventDefault(); caixa.classList.add("arrasta"); });
+  caixa.addEventListener("dragleave", () => caixa.classList.remove("arrasta"));
+  caixa.addEventListener("drop", e => { e.preventDefault(); caixa.classList.remove("arrasta"); if (e.dataTransfer.files[0]) importarArquivo(e.dataTransfer.files[0]); });
+  return h("div", {}, caixa, entrada);
+}
+
+/** Ajusta um recurso da ficha do próprio jogador (texto digitado ou botões) e publica para a mesa. */
+const mudarRecurso = f => (rc, expr) => {
+  const novo = aplicarExpressao(rc.atual, rc.max, expr);
+  if (novo == null) return redesenhar();
+  rc.atual = novo;
+  aplicarMinhaFicha(f);
+};
+
+// ── aparência e visibilidade dos dados (Dice+) ────────────────
+const CHAVE_ESTILO = "senshi/estilo-dados";
+const FONTES_DADOS = [["standard", "Padrão"], ["norse", "Nórdica"], ["aelfa", "Élfica"]];
+const luz = hex => { const n = parseInt(String(hex).replace("#", "").padEnd(6, "0").slice(0, 6), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+
+/** O visual escolhido, já como "estilo padrão" do Dice+. Sem escolha, usa a cor da própria ficha. */
+function estiloDados() {
+  const s = ler(CHAVE_ESTILO) || { preset: "ficha" };
+  const tema = estado.ficha?.cores?.tema || "#9a9aa4";
+  const base = s.preset === "ficha" || !VISUAIS_DADOS[s.preset]
+    ? { color: tema, numberColor: luz(tema) > 0.55 ? "#10101a" : "#ffffff", metalness: 0.5, roughness: 0.3, sheen: 0.4 }
+    : (({ nome, ...resto }) => resto)(VISUAIS_DADOS[s.preset]);
+  return { ...base, ...(s.cor ? { color: s.cor } : {}), ...(s.numero ? { numberColor: s.numero } : {}), ...(s.fonte ? { font: s.fonte } : {}) };
+}
+
+function painelDados() {
+  const s = ler(CHAVE_ESTILO) || { preset: "ficha" };
+  const atual = estiloDados();
+  const salvar = p => { guardar(CHAVE_ESTILO, { ...s, ...p }); redesenhar(); };
+  const corpo = h("div", { class: "interno dados-cfg" },
+    h("label", {}, "Quem vê as rolagens",
+      Object.assign(h("select", { onchange: e => guardar(CHAVE_ALVO, e.target.value) }, ALVOS_ROLAGEM.map(([v, t]) => h("option", { value: v }, t))), { value: ler(CHAVE_ALVO) || "everyone" })),
+    h("label", {}, "Visual dos dados",
+      Object.assign(h("select", { onchange: e => salvar({ preset: e.target.value, cor: undefined, numero: undefined, fonte: undefined }) },
+        Object.entries(VISUAIS_DADOS).map(([id, v]) => h("option", { value: id }, v.nome))), { value: s.preset || "ficha" })),
+    h("div", { class: "grade2" },
+      h("label", {}, "Cor do dado", h("input", { type: "color", value: atual.color, onchange: e => salvar({ cor: e.target.value }) })),
+      h("label", {}, "Cor dos números", h("input", { type: "color", value: atual.numberColor, onchange: e => salvar({ numero: e.target.value }) }))),
+    h("label", {}, "Fonte dos números",
+      Object.assign(h("select", { onchange: e => salvar({ fonte: e.target.value }) }, FONTES_DADOS.map(([v, t]) => h("option", { value: v }, t))), { value: atual.font || "standard" })),
+    h("p", { class: "nota" }, "O Dice+ usa os dados do seu próprio saco, se você já montou um lá. Este visual vale para os tipos de dado que não estão no seu saco."));
+  return details("dados-cfg", h("span", {}, "🎲 Dados · quem vê e aparência"), corpo, "jogador");
+}
+
+// ── janelas separadas: só recursos e só skills ────────────────
+function painelRecursos() {
+  const f = estado.ficha;
+  if (!f) return painelSemFicha();
+  return comTema(f,
+    h("div", { class: "cab" }, h("strong", {}, f.nome), h("span", { class: "mudo" }, `Nível ${f.nivel}${f.origem ? " · " + f.origem : ""}`)),
+    h("h2", {}, "Recursos"),
+    secaoRecursos(f, "proprio", "rc", mudarRecurso(f)),
+    h("p", { class: "nota" }, "Digite no número: 25 define, +25 soma, -25 tira, -50% tira metade do máximo. Enter aplica."),
+    estado.publicacao ? h("p", { class: "nota " + (estado.publicacao.startsWith("Não") ? "alerta" : "ok") }, estado.publicacao) : null);
+}
+
+function painelSkills() {
+  const f = estado.ficha;
+  if (!f) return painelSemFicha();
+  return comTema(f,
+    // os recursos ficam à vista aqui em cima: dá para ver o custo saindo ao usar uma skill
+    h("div", { class: "tira" }, secaoRecursos(f, "proprio", "sk", mudarRecurso(f))),
+    painelDados(),
+    h("h2", {}, `Skills (${(f.skills || []).length})`),
+    listaSkills(f, "proprio", "eu"));
+}
+
 function painelFicha() {
   const f = estado.ficha;
-  const entrada = h("input", { type: "file", accept: ".json,application/json", class: "oculto", onchange: e => { if (e.target.files[0]) importarArquivo(e.target.files[0]); } });
-  if (!f) {
-    const caixa = h("div", { class: "vazio" },
-      h("p", {}, "Nenhuma ficha importada."),
-      h("p", { class: "mudo" }, "No site, abra sua ficha e toque em ", h("b", {}, "Owlbear"), " para baixar o arquivo. Depois solte aqui ou escolha o arquivo."),
-      h("button", { onclick: () => entrada.click() }, "Importar ficha"));
-    caixa.addEventListener("dragover", e => { e.preventDefault(); caixa.classList.add("arrasta"); });
-    caixa.addEventListener("dragleave", () => caixa.classList.remove("arrasta"));
-    caixa.addEventListener("drop", e => { e.preventDefault(); caixa.classList.remove("arrasta"); if (e.dataTransfer.files[0]) importarArquivo(e.dataTransfer.files[0]); });
-    return h("div", {}, caixa, entrada);
-  }
+  const entrada = novaEntradaArquivo();
+  if (!f) return painelSemFicha();
   const quando = f.geradoEm ? new Date(f.geradoEm).toLocaleString("pt-BR") : "";
   return h("div", {},
     (f.v || 1) < 3 ? h("p", { class: "nota alerta" }, "Esta ficha foi baixada numa versão antiga: faltam descrições inteiras, dados ou o custo automático das skills. Baixe de novo no site (botão Owlbear) e use Atualizar abaixo.") : null,
-    h("label", { class: "linha mudo", style: { margin: "0 0 8px" } }, "Quem vê as rolagens",
-      Object.assign(h("select", { "aria-label": "Quem vê as rolagens", onchange: e => guardar(CHAVE_ALVO, e.target.value) }, ALVOS_ROLAGEM.map(([v, t]) => h("option", { value: v }, t))), { value: ler(CHAVE_ALVO) || "everyone" })),
-    fichaView(f, "proprio", "eu", (rc, expr) => { const novo = aplicarExpressao(rc.atual, rc.max, expr); if (novo == null) return redesenhar(); rc.atual = novo; aplicarMinhaFicha(f); }),
+    painelDados(),
+    fichaView(f, "proprio", "eu", mudarRecurso(f)),
     h("div", { class: "linha", style: { marginTop: "14px" } },
       h("button", { onclick: () => entrada.click() }, "Atualizar (importar de novo)"),
       h("button", { onclick: retirarFicha }, "Remover")),
@@ -612,7 +723,7 @@ function painelIniciativaJogador() {
 const painelIniciativa = () => estado.souGM ? painelIniciativaMestre() : painelIniciativaJogador();
 
 // ── montagem da tela ──────────────────────────────────────────
-const PAINEIS = { ficha: painelFicha, iniciativa: painelIniciativa, mesa: painelMesa, jogador: painelJogador };
+const PAINEIS = { ficha: painelFicha, recursos: painelRecursos, skills: painelSkills, iniciativa: painelIniciativa, mesa: painelMesa, jogador: painelJogador };
 let desenhando = false, pendente = false;
 
 async function desenhar() {
@@ -630,7 +741,7 @@ async function desenhar() {
       h("span", { class: "titulo" }, JANELAS[JANELA].titulo),
       h("div", { class: "fim" }, botoesZoom(), h("button", { title: "Fechar esta janela", onclick: () => OBR.popover.close(ID_POP) }, "×")),
     ] : [
-      ...["ficha", "iniciativa", ...(estado.souGM ? ["mesa"] : [])].map(a => h("button", { class: "aba", role: "tab", "aria-selected": String(a === atual), onclick: () => { abaAtual = a; guardar("senshi/aba", a); redesenhar(); } }, JANELAS[a].titulo)),
+      ...["ficha", "recursos", "skills", "iniciativa", ...(estado.souGM ? ["mesa"] : [])].map(a => h("button", { class: "aba", role: "tab", "aria-selected": String(a === atual), onclick: () => { abaAtual = a; guardar("senshi/aba", a); redesenhar(); } }, JANELAS[a].titulo)),
       h("div", { class: "fim" }, botoesZoom(), h("button", { title: "Abrir esta aba em uma janela separada", onclick: () => abrirJanela(atual) }, "↗")),
     ]));
     main.replaceChildren(conteudo);
