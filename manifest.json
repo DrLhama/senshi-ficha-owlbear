@@ -1,16 +1,17 @@
 {
-  "name": "Senshi · Ficha",
-  "version": "1.0.0",
-  "manifest_version": 1,
-  "description": "A ficha do jogador sempre à vista, importada do site.",
-  "author": "Mesa Odisseia",
-  "homepage_url": "https://drlhama.github.io/senshi-ficha-owlbear/",
-  "icon": "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg",
-  "action": {
-    "title": "Ficha",
-    "icon": "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg",
-    "popover": "https://drlhama.github.io/senshi-ficha-owlbear/app.html",
-    "width": 390,
-    "height": 640
-  }
+    "name":  "Senshi · Ficha e Iniciativa",
+    "version":  "2.0.0",
+    "manifest_version":  1,
+    "description":  "A ficha do jogador sempre à vista, painel do mestre e iniciativa com ciclos e turnos.",
+    "author":  "Mesa Odisseia",
+    "homepage_url":  "https://drlhama.github.io/senshi-ficha-owlbear/",
+    "icon":  "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg",
+    "background_url":  "https://drlhama.github.io/senshi-ficha-owlbear/background.html",
+    "action":  {
+                   "title":  "Senshi",
+                   "icon":  "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg",
+                   "popover":  "https://drlhama.github.io/senshi-ficha-owlbear/app.html",
+                   "width":  400,
+                   "height":  660
+               }
 }

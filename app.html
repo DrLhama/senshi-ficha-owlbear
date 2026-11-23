@@ -3,72 +3,81 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Senshi · Ficha</title>
+<title>Senshi · Ficha e Iniciativa</title>
 <style>
-  :root { --fundo:#0b0b10; --card:#13131a; --linha:rgba(255,255,255,.09); --texto:#e6e6ec; --mudo:#8d8d9a; --tema:#9a9aa4; --sec:#747784; --ter:#e1e1e7; }
+  :root { --fundo:#0b0b10; --card:#13131a; --linha:rgba(255,255,255,.09); --texto:#e6e6ec; --mudo:#8d8d9a; --tema:#9a9aa4; --sec:#747784; --ter:#e1e1e7; --ok:#7fc79a; --alerta:#e0a25a; }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--fundo); color:var(--texto); font:13px/1.45 system-ui,"Segoe UI",sans-serif; }
   body { display:flex; flex-direction:column; }
   button,input,select { font:inherit; color:inherit; }
   button { cursor:pointer; background:var(--card); border:1px solid var(--linha); border-radius:7px; padding:6px 10px; transition:border-color .15s,background .15s; }
-  button:hover { border-color:var(--tema); }
-  button:active { transform:scale(.97); }
-  input[type=text] { width:100%; background:#0d0d13; border:1px solid var(--linha); border-radius:7px; padding:8px 10px; }
-  input[type=text]:focus { outline:none; border-color:var(--tema); }
-  nav { display:flex; gap:4px; padding:8px 10px 0; border-bottom:1px solid var(--linha); }
-  nav button { border:0; border-radius:7px 7px 0 0; background:none; color:var(--mudo); padding:8px 12px; border-bottom:2px solid transparent; }
-  nav button[aria-selected=true] { color:var(--texto); border-bottom-color:var(--tema); }
+  button:hover:not(:disabled) { border-color:var(--tema); }
+  button:active:not(:disabled) { transform:scale(.97); }
+  button:disabled { opacity:.45; cursor:default; }
+  input[type=text],input[type=number],select { width:100%; background:#0d0d13; border:1px solid var(--linha); border-radius:7px; padding:7px 9px; }
+  input:focus,select:focus { outline:none; border-color:var(--tema); }
+  .topo { display:flex; align-items:center; gap:4px; padding:8px 10px 0; border-bottom:1px solid var(--linha); }
+  .topo .aba { border:0; border-radius:7px 7px 0 0; background:none; color:var(--mudo); padding:8px 12px; border-bottom:2px solid transparent; }
+  .topo .aba[aria-selected=true] { color:var(--texto); border-bottom-color:var(--tema); }
+  .topo .titulo { padding:8px 4px; font-weight:600; }
+  .topo .fim { margin-left:auto; display:flex; gap:4px; padding-bottom:6px; }
+  .topo .fim button { padding:3px 8px; }
   main { flex:1; overflow:auto; padding:12px; }
   .oculto { display:none !important; }
   h2 { margin:14px 0 6px; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--mudo); font-weight:600; }
   h2:first-child { margin-top:0; }
   .linha { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-  .dados { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
-  .dados button { padding:9px 0; font-weight:600; letter-spacing:.03em; }
-  .resultado { margin-top:12px; padding:14px; border:1px solid var(--linha); border-radius:10px; background:var(--card); text-align:center; }
-  .resultado .total { font-size:2.6rem; font-weight:700; line-height:1.1; color:var(--tema); }
-  .resultado .expr { color:var(--mudo); font-size:.78rem; }
-  .resultado .det { margin-top:4px; color:var(--mudo); font-size:.8rem; word-break:break-word; }
-  .erro { color:#ff8a8a; margin-top:8px; font-size:.82rem; }
-  .hist { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
-  .hist li { display:flex; justify-content:space-between; gap:8px; padding:6px 9px; border:1px solid var(--linha); border-radius:7px; background:var(--card); font-size:.8rem; }
-  .hist b { color:var(--tema); }
   .mudo { color:var(--mudo); }
+  .nota { color:var(--mudo); font-size:.78rem; margin:6px 0; }
+  .ok { color:var(--ok); } .alerta { color:var(--alerta); }
   .cab { padding:12px; border:1px solid var(--linha); border-radius:10px; background:linear-gradient(135deg,color-mix(in srgb,var(--tema) 14%,var(--card)),var(--card)); }
   .cab strong { display:block; font-size:1.05rem; color:var(--ter); }
   .barra { margin:6px 0; }
-  .barra .topo { display:flex; justify-content:space-between; align-items:center; font-size:.76rem; margin-bottom:3px; }
+  .barra .topo2 { display:flex; justify-content:space-between; align-items:center; font-size:.76rem; margin-bottom:3px; gap:8px; }
   .barra .trilho { height:8px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
   .barra .enche { height:100%; border-radius:99px; transition:width .25s; }
-  .barra .ajuste button { padding:0 7px; line-height:1.3; }
+  .barra .ajuste { display:flex; align-items:center; gap:4px; }
+  .barra .ajuste button { padding:0 7px; line-height:1.4; }
+  .barra .ajuste input { width:58px; padding:2px 5px; text-align:center; }
   .attrs { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
-  .attr { text-align:left; padding:8px 10px; border-left:3px solid var(--tema); }
+  .attr { padding:8px 10px; border:1px solid var(--linha); border-left:3px solid var(--tema); border-radius:7px; background:var(--card); }
   .attr small { display:block; color:var(--mudo); font-size:.68rem; }
   .attr b { font-size:1.15rem; }
   .chips { display:flex; flex-wrap:wrap; gap:5px; }
-  .chip { padding:3px 8px; border:1px solid var(--linha); border-radius:99px; font-size:.74rem; color:var(--mudo); }
-  .chip b { color:var(--ter); }
-  details.skill { border:1px solid var(--linha); border-radius:8px; background:var(--card); margin-bottom:5px; }
-  details.skill summary { cursor:pointer; padding:7px 10px; list-style:none; display:flex; justify-content:space-between; gap:8px; }
-  details.skill summary::-webkit-details-marker { display:none; }
-  details.skill p { margin:0; padding:0 10px 9px; color:var(--mudo); font-size:.8rem; }
+  .chip { padding:2px 8px; border:1px solid var(--linha); border-radius:99px; font-size:.72rem; color:var(--mudo); }
+  .chip b { color:var(--ter); font-weight:600; }
+  .chip.custo { color:#e8b4b4; border-color:rgba(232,180,180,.3); }
+  details.skill,details.jogador { border:1px solid var(--linha); border-radius:8px; background:var(--card); margin-bottom:5px; }
+  details.skill > summary,details.jogador > summary { cursor:pointer; padding:8px 10px; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+  .skill .res { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .skill .chips { margin-top:5px; }
+  .skill .corpo { padding:0 10px 10px; }
+  .skill .desc { white-space:pre-wrap; word-break:break-word; margin:4px 0 8px; }
+  .skill .modo { border-top:1px dashed var(--linha); padding-top:8px; margin-top:8px; }
+  .skill .modo h3 { margin:0 0 4px; font-size:.82rem; color:var(--ter); }
+  .skill ul { margin:4px 0 0; padding-left:18px; color:var(--mudo); }
   .on { color:var(--tema); }
   .vazio { text-align:center; padding:28px 12px; border:1px dashed var(--linha); border-radius:12px; color:var(--mudo); }
   .vazio.arrasta { border-color:var(--tema); color:var(--texto); }
-  .jogador { margin-bottom:10px; }
-  .jogador > summary { cursor:pointer; padding:8px 10px; border:1px solid var(--linha); border-radius:8px; background:var(--card); }
+  .jogador > summary { display:flex; justify-content:space-between; gap:8px; }
+  .jogador .interno { padding:0 10px 10px; }
+  .ini-contador { display:flex; gap:8px; }
+  .ini-contador > div { flex:1; text-align:center; padding:10px; border:1px solid var(--linha); border-radius:10px; background:var(--card); }
+  .ini-contador b { display:block; font-size:1.7rem; color:var(--tema); line-height:1.1; }
+  .ini-lista { list-style:none; margin:8px 0; padding:0; display:grid; gap:5px; }
+  .ini-lista li { display:flex; align-items:center; gap:6px; padding:7px 9px; border:1px solid var(--linha); border-radius:8px; background:var(--card); }
+  .ini-lista li[data-vez] { border-color:var(--tema); background:color-mix(in srgb,var(--tema) 14%,var(--card)); }
+  .ini-lista li[data-oculto] { opacity:.55; }
+  .ini-lista .nome { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ini-lista .voce { color:var(--tema); font-size:.7rem; }
+  .ini-lista button { padding:2px 7px; }
+  .grade2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 </style>
 </head>
 <body>
-<nav role="tablist">
-  <button role="tab" data-aba="ficha" aria-selected="true">Ficha</button>
-  <button role="tab" data-aba="mesa" aria-selected="false" class="oculto">Mesa</button>
-</nav>
-<main>
-
-  <section id="aba-ficha"></section>
-  <section id="aba-mesa" class="oculto"></section>
-</main>
+<div class="topo" id="topo"></div>
+<main id="main"></main>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

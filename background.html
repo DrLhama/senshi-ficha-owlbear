@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Senshi · fundo</title></head>
+<body>
+<script type="module">
+  // Fica ligado mesmo com o painel fechado: aplica na ficha do jogador o ajuste de recurso
+  // pedido pelo mestre e republica a ficha para a mesa.
+  import { OBR, CANAL_AJUSTE, LOCAL, ler, guardar, publicarFicha } from "./shared.js";
+  OBR.onReady(() => {
+    OBR.broadcast.onMessage(CANAL_AJUSTE, async ({ data }) => {
+      if (!data || data.para !== OBR.player.id) return;
+      const ficha = ler(LOCAL);
+      const rc = ficha?.recursos?.find(r => r.id === data.recurso);
+      if (!rc || !Number.isFinite(data.atual)) return;
+      rc.atual = Math.max(0, Math.min(rc.max, Math.floor(data.atual)));
+      guardar(LOCAL, ficha);
+      await publicarFicha(ficha);
+    });
+  });
+</script>
+</body></html>
