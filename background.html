@@ -4,14 +4,17 @@
 <script type="module">
   // Fica ligado mesmo com o painel fechado: aplica na ficha do jogador o ajuste de recurso
   // pedido pelo mestre e republica a ficha para a mesa.
-  import { OBR, CANAL_AJUSTE, LOCAL, ler, guardar, publicarFicha } from "./shared.js";
+  import { OBR, CANAL_AJUSTE, LOCAL, ler, guardar, publicarFicha, aplicarExpressao } from "./shared.js";
   OBR.onReady(() => {
     OBR.broadcast.onMessage(CANAL_AJUSTE, async ({ data }) => {
       if (!data || data.para !== OBR.player.id) return;
       const ficha = ler(LOCAL);
       const rc = ficha?.recursos?.find(r => r.id === data.recurso);
-      if (!rc || !Number.isFinite(data.atual)) return;
-      rc.atual = Math.max(0, Math.min(rc.max, Math.floor(data.atual)));
+      if (!rc) return;
+      // o mestre manda o texto digitado (+25, -50%…): quem aplica é a ficha do jogador, sobre o valor dela
+      const novo = aplicarExpressao(rc.atual, rc.max, data.expr ?? data.atual);
+      if (novo == null) return;
+      rc.atual = novo;
       guardar(LOCAL, ficha);
       await publicarFicha(ficha);
     });

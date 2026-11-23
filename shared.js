@@ -45,6 +45,20 @@ export async function publicarFicha(ficha) {
   }
 }
 
+/** Digitar num recurso, igual ao site e um pouco além:
+ *  25 define em 25 · +25 soma · -25 tira · 50% define em 50% do máximo · +10% / -50% somam/tiram essa parte do máximo.
+ *  Devolve o novo valor (entre 0 e o máximo) ou null se o texto não for entendido. */
+export function aplicarExpressao(atual, max, texto) {
+  const s = String(texto ?? "").trim().replace(",", ".").replace(/\s+/g, "");
+  const m = /^([+-]?)(\d+(?:\.\d+)?)(%?)$/.exec(s);
+  if (!m) return null;
+  const [, sinal, num, pct] = m;
+  const n = Number(num);
+  const parte = pct ? (max * n) / 100 : n;
+  const novo = sinal === "+" ? atual + parte : sinal === "-" ? atual - parte : parte;
+  return Math.max(0, Math.min(max, Math.round(novo)));
+}
+
 export const cabecalhoDe = meta => meta?.[CHAVE] || null;
 
 /** Remonta a ficha completa a partir dos metadados de um jogador. */
