@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Senshi · bússola</title>
+<style>
+  :root { --ouro:#ffe2a0; --serifa:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif; }
+  html,body { margin:0; height:100%; overflow:hidden; background:transparent; color:#fff; font:13px system-ui,"Segoe UI",sans-serif; user-select:none; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  button:focus-visible { outline:2px solid var(--ouro); outline-offset:1px; }
+  #corpo { position:absolute; inset:0; display:flex; align-items:stretch; }
+  .seta { flex:none; width:44px; margin:14px 0 22px; border:0; border-radius:12px; background:rgba(8,7,16,.78); color:var(--ouro); font-size:20px; text-shadow:0 0 12px #b86bff; transition:background .15s,transform .1s; }
+  .seta:hover { background:rgba(90,60,150,.75); } .seta:active { transform:scale(.92); }
+  #janela { position:relative; flex:1; min-width:0; overflow:hidden; -webkit-mask:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent); mask:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent); background:linear-gradient(180deg,rgba(6,5,14,0),rgba(6,5,14,.82) 22%,rgba(6,5,14,.82) 74%,rgba(6,5,14,0)); }
+  #trilho { position:absolute; left:50%; top:0; bottom:0; transition:transform .42s cubic-bezier(.2,.9,.25,1); }
+  #trilho.seco { transition:none; }
+  .cel { position:absolute; top:12px; width:116px; height:66px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; opacity:.5; transform:scale(.86); transition:opacity .35s,transform .35s; text-shadow:0 1px 5px #000; }
+  .cel b { max-width:108px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 14px var(--serifa); }
+  .cel i { font:700 21px/1 var(--serifa); font-style:normal; color:var(--cor); text-shadow:0 0 14px var(--cor),0 1px 4px #000; }
+  .cel::after { content:""; position:absolute; left:0; right:0; bottom:0; height:9px; background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--cor) 75%,#fff) 0 1px,transparent 1px 14.5px); opacity:.75; -webkit-mask:linear-gradient(90deg,#000 1px,rgba(0,0,0,.45) 1px); }
+  .cel.agora { opacity:1; transform:scale(1.12); } .cel.agora b { color:var(--ouro); }
+  .cel.agora::before { content:""; position:absolute; inset:-4px 4px 4px; z-index:-1; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--cor) 55%,transparent),transparent); animation:respira 2.2s ease-in-out infinite; }
+  .cel.oculto b { font-style:italic; opacity:.75; }
+  .cel .ciclo { position:absolute; left:-1px; top:-4px; bottom:0; border-left:2px solid var(--ouro); padding-left:5px; font:600 10px system-ui; letter-spacing:.1em; color:var(--ouro); text-transform:uppercase; white-space:nowrap; }
+  #ponteiro { position:absolute; left:50%; top:2px; width:0; height:0; margin-left:-8px; border:8px solid transparent; border-top:10px solid var(--ouro); filter:drop-shadow(0 0 6px #b86bff); z-index:2; }
+  #pe { position:absolute; left:0; right:0; bottom:3px; text-align:center; font:600 12px var(--serifa); letter-spacing:.12em; color:#e9dfc8; text-shadow:0 0 8px #000,0 1px 3px #000; }
+  #pe button { margin-left:10px; padding:0 6px; border:0; border-radius:6px; background:rgba(8,7,16,.7); color:#b9b2c8; font:11px system-ui; }
+  body.minha #pe { color:#8fffc0; } body.minha #ponteiro { border-top-color:#6dffae; }
+  #chamada { margin:auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; max-width:100%; padding:10px 18px; border-radius:16px; background:rgba(8,7,16,.88); box-shadow:0 0 0 1px #ffe2a055,0 0 34px #7a4bd066; }
+  #chamada > b { font:600 17px var(--serifa); letter-spacing:.2em; text-transform:uppercase; color:var(--ouro); text-shadow:0 0 14px #b86bff; }
+  #chamada .pessoa { display:flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; background:color-mix(in srgb,var(--cor) 28%,#0b0a14); border:1px solid color-mix(in srgb,var(--cor) 70%,transparent); max-width:150px; } #chamada .pessoa span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #chamada .pessoa small { opacity:.75; }
+  #chamada button { padding:8px 16px; border:0; border-radius:20px; background:linear-gradient(180deg,#ffe9b8,#d9a545); color:#1b1208; font-weight:700; box-shadow:0 0 18px #ffb84a88; animation:respira 2s ease-in-out infinite; } #chamada button.leve { background:rgba(255,255,255,.12); color:#fff; box-shadow:none; animation:none; }
+  @keyframes respira { 50% { filter:brightness(1.35); } }
+  @media (prefers-reduced-motion:reduce) { #trilho,.cel { transition:none; } .cel.agora::before,#chamada button { animation:none; } }
+</style></head>
+<body>
+<div id="corpo"></div>
+<script type="module">
+  // A bússola: fica presa no alto da tela de todos enquanto há combate. Qualquer um avança ou volta; quem muda é o fundo do mestre.
+  import { OBR, CHAVE_INI, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=16";
+  import { h } from "./nucleo.js?v=16";
+  import { canal } from "./janelas.js?v=16";
+  import { CANAL_PASSO, alternarPronto, dadoDaFicha, escreverDado, iniciarIniciativa, lerPronto, novoId, INI_VAZIA } from "./iniciativa.js?v=16";
+
+  const LARGURA = 116, LADO = 6, corpo = document.getElementById("corpo");
+  let souGM = false, publica = null, jogadores = [], meuPronto = null, celulas = new Map(), assinatura = "", trilho = null;
+
+  const passo = p => OBR.broadcast.sendMessage(CANAL_PASSO, { id: novoId(), passo: p }, { destination: "ALL" });
+  const LUGARES = [8, 64, 120];
+  const descer = () => {
+    guardar("senshi/bussola-top", LUGARES[(LUGARES.indexOf(ler("senshi/bussola-top") ?? 8) + 1) % LUGARES.length]);
+    canal?.postMessage({ t: "bussola" });
+  };
+
+  function chamada() {
+    trilho = null;
+    const ini = { ...INI_VAZIA(), ...ler(LOCAL_INI) };
+    const prontos = jogadores.map(p => [p, lerPronto(p.metadata)]).filter(([, x]) => x), dado = dadoDaFicha(ler("senshi/ficha"))?.dado;
+    const n = ini.combatentes.filter(c => !prontos.some(([p]) => p.id === c.jogador)).length + prontos.length;
+    corpo.replaceChildren(h("div", { id: "chamada" }, h("b", {}, "Iniciativa"),
+      meuPronto ? h("span", { class: "pessoa", style: { "--cor": "#8fffc0" } }, h("span", {}, "Você"), h("small", {}, escreverDado(meuPronto.dado))) : null,
+      prontos.map(([p, x]) => h("span", { class: "pessoa", style: { "--cor": corSegura(p.color) } }, h("span", {}, x.nome || p.name), h("small", {}, escreverDado(x.dado)))),
+      souGM
+        ? h("button", { disabled: !n, onclick: () => iniciarIniciativa(ini, jogadores).catch(() => OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR")) }, `Iniciar iniciativa (${n})`)
+        : h("button", { class: meuPronto ? "leve" : "", onclick: async () => { const erro = await alternarPronto(meuPronto); if (erro) OBR.notification.show(erro, "WARNING"); } }, meuPronto ? "Largar o dado" : `Rolar iniciativa${dado ? " · " + escreverDado(dado) : ""}`)));
+  }
+
+  /** O que este navegador vê: o mestre vê os ocultos; o jogador vê um vulto quando a vez é de um deles. */
+  function lista() {
+    const minha = souGM && ler(LOCAL_INI);
+    if (minha?.combatentes?.length) return { l: minha.combatentes, vez: minha.vez, ciclo: minha.ciclo };
+    const l = [...publica.combatentes];
+    if (publica.vez === "?") l.splice(publica.lugar || 0, 0, { id: "?", nome: "???", cor: "#8a8798", visivel: false });
+    return { l, vez: publica.vez, ciclo: publica.ciclo };
+  }
+
+  function bussola() {
+    const { l, vez, ciclo } = lista(), n = l.length;
+    if (!n) return corpo.replaceChildren();
+    if (!trilho) {
+      celulas = new Map(); assinatura = "";
+      trilho = h("div", { id: "trilho" });
+      corpo.replaceChildren(
+        h("button", { class: "seta", onclick: () => passo(-1), "aria-label": "Voltar um turno", title: "Voltar um turno" }, "◀"),
+        h("div", { id: "janela" }, h("div", { id: "ponteiro" }), trilho, h("div", { id: "pe", role: "status" }, h("span", {}), h("button", { onclick: descer, title: "Mudar a altura da bússola", "aria-label": "Mudar a altura da bússola" }, "⇕"))),
+        h("button", { class: "seta", onclick: () => passo(1), "aria-label": "Avançar um turno", title: "Avançar um turno" }, "▶"));
+    }
+    const i = Math.max(0, l.findIndex(c => c.id === vez)), onde = (ciclo - 1) * n + i, nova = l.map(c => [c.id, c.nome, c.valor, c.cor, c.visivel, c.oculta].join()).join("|");
+    const seco = nova !== assinatura;
+    if (seco) { trilho.replaceChildren(); celulas.clear(); assinatura = nova; }
+    trilho.classList.toggle("seco", seco);
+    for (const [k, el] of celulas) if (Math.abs(k - onde) > LADO + 2) { el.remove(); celulas.delete(k); }
+    for (let k = Math.max(0, onde - LADO); k <= onde + LADO; k++) {
+      if (!celulas.has(k)) {
+        const c = l[k % n];
+        const el = h("div", { class: "cel" + (c.visivel === false ? " oculto" : ""), style: { left: k * LARGURA - LARGURA / 2 + "px", "--cor": corSegura(c.cor, "#b9b2c8") } },
+          k % n === 0 ? h("span", { class: "ciclo" }, "Ciclo " + (k / n + 1)) : null, h("b", {}, c.nome), c.valor != null ? h("i", {}, Number(c.valor).toLocaleString("pt-BR")) : null);
+        trilho.append(el);
+        celulas.set(k, el);
+      }
+    }
+    for (const [k, el] of celulas) el.classList.toggle("agora", k === onde);
+    trilho.style.transform = `translateX(${-onde * LARGURA}px)`;
+    const minha = l[i].jogador && l[i].jogador === OBR.player.id;
+    document.body.classList.toggle("minha", !!minha);
+    corpo.querySelector("#pe span").textContent = `Ciclo ${ciclo}  ·  Turno ${publica.turno}/${publica.total}${minha ? "  ·  SUA VEZ" : ""}`;
+  }
+  const pintar = () => { if (publica?.ativo) bussola(); else if (publica?.chamada) chamada(); else corpo.replaceChildren(); };
+
+  OBR.onReady(async () => {
+    const [papel, sala, outros, meta] = await Promise.all([OBR.player.getRole(), OBR.room.getMetadata(), OBR.party.getPlayers(), OBR.player.getMetadata()]);
+    souGM = papel === "GM"; publica = sala[CHAVE_INI]; jogadores = outros; meuPronto = lerPronto(meta);
+    OBR.room.onMetadataChange(m => { publica = m[CHAVE_INI]; pintar(); });
+    OBR.party.onChange(l => { jogadores = l; if (!publica?.ativo) pintar(); });
+    OBR.player.onChange(p => { meuPronto = lerPronto(p.metadata); if (!publica?.ativo) pintar(); });
+    pintar();
+  });
+</script>
+</body></html>

@@ -1,4 +1,4 @@
-import { OBR, VERSAO, ler, guardar } from "./shared.js?v=15";
+import { OBR, VERSAO, ler, guardar } from "./shared.js?v=16";
 
 /** Janelas livres: cada uma é um popover do Owlbear com abas. O registro guarda onde estão, para reabrir no mesmo lugar. */
 const REGISTRO = "senshi/janelas-v9";
@@ -57,6 +57,19 @@ export async function abrirPopover(id) {
     anchorOrigin: { horizontal: "LEFT", vertical: "TOP" }, transformOrigin: { horizontal: "LEFT", vertical: "TOP" },
     disableClickAway: true, marginThreshold: 0,
   });
+}
+
+/** A bússola da iniciativa, no centro do alto da tela. */
+export const BUSSOLA = "senshi-bussola";
+export async function abrirBussola() {
+  const t = await tela(), w = Math.min(860, t.w - 16);
+  await OBR.popover.open({
+    id: BUSSOLA, url: endereco("bussola.html", {}), width: w, height: 104,
+    anchorReference: "POSITION", anchorPosition: { left: Math.round((t.w - w) / 2), top: ler("senshi/bussola-top") ?? 8 },
+    anchorOrigin: { horizontal: "LEFT", vertical: "TOP" }, transformOrigin: { horizontal: "LEFT", vertical: "TOP" },
+    disableClickAway: true, hidePaper: true, marginThreshold: 0,
+  });
+  return t.w;
 }
 
 /** Há uma janela mais nova por cima desta? */

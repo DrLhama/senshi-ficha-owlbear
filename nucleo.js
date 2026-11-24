@@ -1,4 +1,4 @@
-import { ler, guardar } from "./shared.js?v=15";
+import { ler, guardar } from "./shared.js?v=16";
 
 export const ID = new URLSearchParams(location.search).get("id") || "";
 export const $ = sel => document.querySelector(sel);
@@ -45,6 +45,7 @@ export const estado = {
   ficha: null,            // ficha do próprio jogador (cópia local)
   jogadores: [],          // outros jogadores da sala
   iniPublica: null,       // parte pública da iniciativa (todos leem)
+  meuPronto: null,        // o dado de iniciativa na mão do próprio jogador
   iniMestre: null,        // iniciativa completa (só o mestre grava)
   publicacao: "",         // resultado da última publicação da ficha
   aba: "ficha", alvo: "",

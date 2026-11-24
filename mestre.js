@@ -1,7 +1,8 @@
-import { OBR, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, cabecalhoDe, lerFicha, guardar, aplicarExpressao } from "./shared.js?v=15";
-import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=15";
-import { barra, fichaView } from "./paineis.js?v=15";
-import { novaJanela } from "./janelas.js?v=15";
+import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=16";
+import { INI_VAZIA, avancar, alternarPronto, combatenteDe, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=16";
+import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=16";
+import { barra, fichaView } from "./paineis.js?v=16";
+import { novaJanela } from "./janelas.js?v=16";
 
 // ── mesa (mestre) ─────────────────────────────────────────────
 function pedirAjuste(jogador, rc, expr) {
@@ -75,116 +76,136 @@ export async function painelJogador() {
 }
 
 // ── iniciativa ────────────────────────────────────────────────
-const novoId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
-export const INI_VAZIA = () => ({ ativo: false, combatentes: [], vez: null, turnosPorCiclo: 3, turno: 1, ciclo: 1 });
-
 async function salvarIni(ini) {
   estado.iniMestre = ini;
-  guardar(LOCAL_INI, ini);
-  const visiveis = ini.combatentes.filter(c => c.visivel);
-  const vez = ini.combatentes.find(c => c.id === ini.vez);
-  const publica = {
-    ativo: ini.ativo, turnosPorCiclo: ini.turnosPorCiclo, turno: ini.turno, ciclo: ini.ciclo,
-    vez: vez ? (vez.visivel ? vez.id : "?") : null,                       // quem está oculto não aparece pelo nome
-    combatentes: visiveis.map(({ id, nome, jogador }) => ({ id, nome, jogador })),
-  };
-  estado.iniPublica = publica;
   redesenhar();
-  try { await OBR.room.setMetadata({ [CHAVE_INI]: publica }); } catch { OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR"); }
+  try { estado.iniPublica = await publicarIni(ini); } catch { OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR"); }
 }
 
-function avancar(ini, sentido) {
-  const n = ini.combatentes.length;
-  if (!n) return ini;
-  const i = Math.max(0, ini.combatentes.findIndex(c => c.id === ini.vez));
-  const prox = { ...ini, vez: ini.combatentes[(i + sentido + n) % n].id };
-  prox.turno += sentido;
-  if (prox.turno > prox.turnosPorCiclo) { prox.turno = 1; prox.ciclo += 1; }
-  if (prox.turno < 1) { prox.turno = prox.turnosPorCiclo; prox.ciclo = Math.max(1, prox.ciclo - 1); }
-  return prox;
-}
-
-function contador(ini) {
+function contador(ciclo, turno, total) {
   return h("div", { class: "ini-contador" },
-    h("div", {}, h("span", { class: "mudo" }, "Ciclo"), h("b", {}, ini.ciclo)),
-    h("div", {}, h("span", { class: "mudo" }, "Turno"), h("b", {}, ini.turno, h("small", {}, `/${ini.turnosPorCiclo}`)),
-      h("div", { class: "pontos" }, Array.from({ length: Math.min(12, ini.turnosPorCiclo) }, (_, i) => h("i", { "data-cheio": i < ini.turno })))));
+    h("div", {}, h("span", { class: "mudo" }, "Ciclo"), h("b", {}, ciclo)),
+    h("div", {}, h("span", { class: "mudo" }, "Turno"), h("b", {}, turno, h("small", {}, `/${total}`)),
+      h("div", { class: "pontos" }, Array.from({ length: Math.min(16, total) }, (_, i) => h("i", { "data-cheio": i < turno })))));
 }
+/** A roleta na mão de quem está pronto. */
+const roletinha = (nome, cor, dado) => h("div", { class: "roletinha", style: { "--cor": corSegura(cor) } }, h("i", {}, h("b", {}, "d" + dado.f)), h("span", {}, nome), h("small", {}, dado.b ? (dado.b > 0 ? "+" : "") + dado.b : ""));
 
 let arrastando = null;
 function painelMestre() {
-  const ini = estado.iniMestre || INI_VAZIA();
+  const ini = { ...INI_VAZIA(), ...estado.iniMestre };
   const mudar = alteracao => salvarIni({ ...ini, ...alteracao });
   const lista = ini.combatentes;
   const por = (c, patch) => mudar({ combatentes: lista.map(x => x.id === c.id ? { ...x, ...patch } : x) });
   const mover = (de, para) => { if (para < 0 || para >= lista.length || de === para) return; const c = [...lista]; c.splice(para, 0, ...c.splice(de, 1)); mudar({ combatentes: c }); };
-  const juntar = novos => { if (novos.length) { const combatentes = [...lista, ...novos]; mudar({ combatentes, vez: ini.vez ?? combatentes[0].id }); } };
+  // com o combate andando, quem chega já rola e entra no lugar dele
+  const juntar = novos => { if (novos.length) ini.ativo ? salvarIni(entrarNoMeio(ini, novos)) : mudar({ combatentes: [...lista, ...novos] }); };
 
   const adicionar = () => {
-    const texto = (rascunho["ini-nome"] || "").trim();
+    const texto = (rascunho["ini-nome"] || "").trim(), bruto = (rascunho["ini-dado"] || "").trim(), dado = lerDado(bruto || "d100");
     if (!texto) return;
-    const jogador = rascunho["ini-jogador"] || undefined, visivel = rascunho["ini-visivel"] !== "0";
+    if (!dado) return OBR.notification.show("Dado não entendido. Use d200+150, +50 ou 50.", "WARNING");
+    const visivel = rascunho["ini-visivel"] !== "0", oculta = rascunho["ini-oculta"] === "1";
     // "Goblin x3" cria Goblin 1, Goblin 2 e Goblin 3
-    const m = jogador ? null : /^(.+?)\s+x(\d{1,2})$/i.exec(texto);
-    rascunho["ini-nome"] = ""; rascunho["ini-jogador"] = "";
-    juntar(m ? Array.from({ length: Math.max(1, Math.min(20, Number(m[2]))) }, (_, i) => ({ id: novoId(), nome: `${m[1]} ${i + 1}`, visivel })) : [{ id: novoId(), nome: texto, visivel, jogador }]);
+    const m = /^(.+?)\s+x(\d{1,2})$/i.exec(texto), novo = nome => ({ id: novoId(), nome, cor: corDoNome(nome), visivel, oculta, dado });
+    rascunho["ini-nome"] = "";
+    juntar(m ? Array.from({ length: Math.max(1, Math.min(20, Number(m[2]))) }, (_, i) => novo(`${m[1]} ${i + 1}`)) : [novo(texto)]);
   };
-  const faltam = estado.jogadores.filter(p => cabecalhoDe(p.metadata) && !lista.some(c => c.jogador === p.id));
-  const visivel = h("input", { type: "checkbox", onchange: e => { rascunho["ini-visivel"] = e.target.checked ? "1" : "0"; } });
-  visivel.checked = rascunho["ini-visivel"] !== "0";
+  const prontos = estado.jogadores.map(p => [p, lerPronto(p.metadata)]).filter(([, x]) => x), esperando = prontos.filter(([p]) => !lista.some(c => c.jogador === p.id));
+  const semClicar = estado.jogadores.filter(p => cabecalhoDe(p.metadata) && !prontos.some(([x]) => x.id === p.id) && !lista.some(c => c.jogador === p.id));
+  // o mestre pode pôr quem não clicou, lendo a Agilidade da ficha
+  const porTodos = async () => {
+    const novos = [];
+    for (const p of semClicar) {
+      const f = await fichaDe(p), d = dadoDaFicha(f);
+      if (d) novos.push(combatenteDe(p, { nome: f.nome, ...d }));
+    }
+    if (novos.length < semClicar.length) OBR.notification.show("Há ficha sem Agilidade: peça para o jogador rolar.", "WARNING");
+    juntar(novos);
+  };
+  const iniciar = async () => {
+    try {
+      const nova = await iniciarIniciativa(ini, estado.jogadores);
+      if (nova) { estado.iniMestre = nova; redesenhar(); }
+    } catch { OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR"); }
+  };
+  const marca = (chave, padrao, rotulo, dica) => {
+    const el = h("input", { type: "checkbox", onchange: e => { rascunho[chave] = e.target.checked ? "1" : "0"; } });
+    el.checked = (rascunho[chave] ?? padrao) === "1";
+    return h("label", { class: "linha mudo", title: dica }, el, rotulo);
+  };
 
   const linha = (c, i) => {
     const p = c.jogador && estado.jogadores.find(x => x.id === c.jogador), cab = p && cabecalhoDe(p.metadata), vida = cab?.recursos?.[0];
-    const valor = h("input", { type: "number", class: "ini-valor", placeholder: "–", title: "Valor da iniciativa, usado pelo botão Ordenar", "aria-label": `Iniciativa de ${c.nome}`, "data-foco": "iv:" + c.id, onchange: e => por(c, { valor: e.target.value === "" ? undefined : Number(e.target.value) }) });
+    const valor = h("input", { type: "number", class: "ini-valor", placeholder: "–", title: "Resultado da iniciativa. Mude aqui e clique em Ordenar.", "aria-label": `Iniciativa de ${c.nome}`, "data-foco": "iv:" + c.id, onchange: e => por(c, { valor: e.target.value === "" ? undefined : Number(e.target.value) }) });
     valor.value = c.valor ?? "";
+    const dado = h("input", { class: "ini-dado", title: "Dado e bônus", "aria-label": `Dado de ${c.nome}`, "data-foco": "id:" + c.id, onchange: e => { const d = lerDado(e.target.value); d ? por(c, { dado: d, valor: undefined }) : redesenhar(); } });
+    dado.value = c.dado ? escreverDado(c.dado) : "";
     return h("li", {
-      draggable: "true", "data-vez": ini.ativo && c.id === ini.vez, "data-oculto": !c.visivel,
+      draggable: "true", "data-vez": ini.ativo && c.id === ini.vez, "data-oculto": !c.visivel, style: { "--cor": corSegura(c.cor) },
       ondragstart: e => { arrastando = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", c.nome); },
       ondragover: e => { if (arrastando != null) e.preventDefault(); },
       ondrop: e => { if (arrastando != null) { e.preventDefault(); e.stopPropagation(); mover(arrastando, i); } arrastando = null; },
       ondragend: () => { arrastando = null; },
     },
-    h("button", { class: "marca", title: "Dar a vez a este combatente", onclick: () => mudar({ vez: c.id }), "aria-label": `Dar a vez a ${c.nome}` }, c.id === ini.vez ? "▶" : i + 1),
-    valor,
-    h("span", { class: "nome", title: c.nome }, c.nome, vida ? h("span", { class: "fio", style: { "--p": (vida.max > 0 ? Math.max(0, Math.min(100, vida.atual / vida.max * 100)) : 0) + "%", "--cor": /^#[0-9a-f]{3,8}$/i.test(vida.cor) ? vida.cor : "var(--tema)" }, title: `${vida.nome} ${vida.atual}/${vida.max}` }) : null),
+    h("button", { class: "marca", title: "Dar a vez a este combatente", onclick: () => mudar({ vez: c.id }), "aria-label": `Dar a vez a ${c.nome}` }, ini.ativo && c.id === ini.vez ? "▶" : i + 1),
+    ini.ativo ? valor : dado,
+    h("span", { class: "nome", title: c.nome }, c.nome, vida ? h("span", { class: "fio", style: { "--p": (vida.max > 0 ? Math.max(0, Math.min(100, vida.atual / vida.max * 100)) : 0) + "%", "--cor": corSegura(vida.cor) }, title: `${vida.nome} ${vida.atual}/${vida.max}` }) : null),
     p && cab ? botaoIcone("jogador", "Abrir a ficha", () => abrirFicha(p.id)) : null,
+    c.jogador ? null : h("button", { class: "ico", title: c.oculta ? "Bônus escondido: os jogadores veem só o número do dado. Clique para mostrar." : "Bônus à mostra. Clique para esconder.", "aria-label": c.oculta ? `Mostrar o bônus de ${c.nome}` : `Esconder o bônus de ${c.nome}`, onclick: () => por(c, { oculta: !c.oculta }) }, c.oculta ? "🙈" : "±"),
     h("button", { class: "ico", title: c.visivel ? "Visível para os jogadores. Clique para ocultar." : "Oculto dos jogadores. Clique para mostrar.", "aria-label": c.visivel ? `Ocultar ${c.nome}` : `Mostrar ${c.nome}`, onclick: () => por(c, { visivel: !c.visivel }) }, c.visivel ? "👁" : "—"),
-    h("span", { class: "sobe" }, h("button", { onclick: () => mover(i, i - 1), "aria-label": `Subir ${c.nome}`, disabled: i === 0 }, "▴"), h("button", { onclick: () => mover(i, i + 1), "aria-label": `Descer ${c.nome}`, disabled: i === lista.length - 1 }, "▾")),
+    ini.ativo ? h("span", { class: "sobe" }, h("button", { onclick: () => mover(i, i - 1), "aria-label": `Subir ${c.nome}`, disabled: i === 0 }, "▴"), h("button", { onclick: () => mover(i, i + 1), "aria-label": `Descer ${c.nome}`, disabled: i === lista.length - 1 }, "▾")) : null,
     botaoIcone("fechar", `Remover ${c.nome}`, () => { const combatentes = lista.filter(x => x.id !== c.id); mudar({ combatentes, vez: ini.vez === c.id ? (combatentes[Math.min(i, combatentes.length - 1)]?.id ?? null) : ini.vez }); }));
   };
 
   return h("div", {},
-    contador(ini),
-    h("div", { class: "linha", style: { margin: "10px 0" } },
-      ini.ativo
-        ? [h("button", { onclick: () => mudar(avancar(ini, -1)), "aria-label": "Turno anterior" }, "◀"), h("button", { class: "forte cresce", onclick: () => mudar(avancar(ini, 1)) }, "Próximo turno ▶"), confirmar("ini-fim", "Encerrar", () => mudar({ ativo: false }))]
-        : h("button", { class: "forte cresce", onclick: () => mudar({ ativo: true, ciclo: 1, turno: 1, vez: lista[0]?.id ?? null }), disabled: !lista.length }, "Iniciar combate")),
-    h("label", { class: "linha mudo", title: "Cada Próximo turno passa a vez e conta 1 turno. Ao completar os turnos do ciclo, começa o ciclo seguinte." }, "Turnos por ciclo",
-      h("input", { type: "number", min: 1, max: 99, value: ini.turnosPorCiclo, style: { width: "70px" }, onchange: e => mudar({ turnosPorCiclo: Math.max(1, Math.floor(Number(e.target.value)) || 1) }) })),
-    titulo("Combatentes", lista.some(c => c.valor != null) ? h("button", { class: "link", title: "Do maior valor para o menor", onclick: () => mudar({ combatentes: [...lista].sort((a, b) => (b.valor ?? -Infinity) - (a.valor ?? -Infinity)) }) }, "Ordenar") : null),
-    h("ul", { class: "ini-lista" }, lista.length ? lista.map(linha) : h("li", { class: "mudo" }, "Nenhum combatente ainda.")),
-    titulo("Adicionar", faltam.length ? h("button", { class: "link", onclick: () => juntar(faltam.map(p => ({ id: novoId(), nome: cabecalhoDe(p.metadata).nome || p.name, visivel: true, jogador: p.id }))) }, `Todos os jogadores (${faltam.length})`) : null),
-    h("div", { class: "linha" }, campo("ini-nome", { placeholder: "Nome, ou Goblin x3", "aria-label": "Nome do combatente", onkeydown: e => { if (e.key === "Enter") adicionar(); } }), h("button", { class: "forte", onclick: adicionar }, "＋")),
-    h("div", { class: "grade2", style: { marginTop: "6px" } },
-      seletor([["", "Sem ficha vinculada"], ...estado.jogadores.map(p => [p.id, `Ficha de ${p.name || "jogador"}`])], rascunho["ini-jogador"] || "", v => { rascunho["ini-jogador"] = v; }, { "aria-label": "Vincular a um jogador" }),
-      h("label", { class: "linha mudo" }, visivel, "visível aos jogadores")),
-    lista.length ? h("div", { class: "linha rodape" }, confirmar("ini-limpar", "Limpar lista", () => mudar({ ...INI_VAZIA(), turnosPorCiclo: ini.turnosPorCiclo }))) : null);
+    ini.ativo
+      ? [contador(ini.ciclo, Math.max(0, lista.findIndex(c => c.id === ini.vez)) + 1, lista.length),
+        h("div", { class: "linha", style: { margin: "10px 0" } },
+          h("button", { onclick: () => mudar(avancar(ini, -1)), "aria-label": "Turno anterior" }, "◀"), h("button", { class: "forte cresce", onclick: () => mudar(avancar(ini, 1)) }, "Próximo turno ▶"),
+          // os jogadores rolam de novo no próximo combate; os mobs ficam para reaproveitar
+          confirmar("ini-fim", "Encerrar", () => salvarIni({ ...INI_VAZIA(), combatentes: lista.filter(c => !c.jogador).map(({ valor, base, ...c }) => c) })))]
+      : h("div", { class: "ini-sala" },
+        prontos.length ? h("div", { class: "roletinhas" }, prontos.map(([p, x]) => roletinha(x.nome || p.name, p.color, x.dado))) : h("p", { class: "mudo" }, "Ninguém está com o dado na mão ainda."),
+        h("div", { class: "linha" },
+          h("button", { "aria-pressed": String(!!ini.chamada), title: "Mostra o botão de rolar no alto da tela de todos", onclick: () => mudar({ chamada: !ini.chamada }) }, ini.chamada ? "Chamando…" : "Chamar jogadores"),
+          h("button", { class: "forte cresce", onclick: iniciar, disabled: !prontos.length && !lista.length }, `Iniciar iniciativa (${lista.length + esperando.length})`))),
+    ini.ativo && esperando.length ? h("div", { class: "nota linha" }, h("span", { class: "cresce" }, `${esperando.map(([p, x]) => x.nome || p.name).join(", ")} quer entrar.`), h("button", { onclick: () => juntar(esperando.map(([p, x]) => combatenteDe(p, x))) }, "Deixar entrar")) : null,
+    titulo("Combatentes", ini.ativo ? h("button", { class: "link", title: "Do maior valor para o menor", onclick: () => mudar({ combatentes: ordenar(lista) }) }, "Ordenar") : null),
+    h("ul", { class: "ini-lista" }, lista.length ? lista.map(linha) : h("li", { class: "mudo" }, "Só os jogadores prontos, por enquanto.")),
+    titulo("Adicionar", semClicar.length ? h("button", { class: "link", title: "Usa a Agilidade da ficha de quem não clicou", onclick: porTodos }, `Jogadores que faltam (${semClicar.length})`) : null),
+    h("div", { class: "linha" }, campo("ini-nome", { placeholder: "Nome, ou Goblin x3", "aria-label": "Nome do combatente", onkeydown: e => { if (e.key === "Enter") adicionar(); } }),
+      campo("ini-dado", { placeholder: "d100+50", class: "ini-dado", "aria-label": "Dado e bônus", onkeydown: e => { if (e.key === "Enter") adicionar(); } }), h("button", { class: "forte", onclick: adicionar, "aria-label": "Adicionar" }, "＋")),
+    h("div", { class: "linha", style: { marginTop: "6px" } }, marca("ini-visivel", "1", "visível aos jogadores", "Desligado, o combatente não aparece para eles"), marca("ini-oculta", "0", "esconder o bônus", "Os jogadores veem só o número do dado")),
+    lista.length ? h("div", { class: "linha rodape" }, confirmar("ini-limpar", "Limpar lista", () => salvarIni(INI_VAZIA()))) : null);
 }
 
-export const minhaVez = () => { const i = estado.iniPublica; return !!i?.ativo && !!i.combatentes?.some(c => c.id === i.vez && c.jogador === estado.meuId); };
+export const minhaVez = () => { const i = estado.iniPublica; return !!i?.ativo && !faltaAnimacao(i) && !!i.combatentes?.some(c => c.id === i.vez && c.jogador === estado.meuId); };
 
 function painelDoJogador() {
-  const ini = estado.iniPublica;
-  if (!ini?.ativo) return h("p", { class: "vazio mudo" }, "Nenhum combate em andamento.");
+  const ini = estado.iniPublica, meu = estado.meuPronto, dado = meu?.dado || dadoDaFicha(estado.ficha)?.dado;
+  const jaEstou = ini?.ativo && ini.combatentes?.some(c => c.jogador === estado.meuId);
+  const rolar = jaEstou ? null : h("div", { class: "ini-sala" },
+    meu ? h("div", { class: "roletinhas" }, roletinha(meu.nome, estado.ficha?.cores?.tema, meu.dado)) : null,
+    h("button", { class: meu ? "" : "forte", "aria-pressed": String(!!meu), onclick: async () => { const erro = await alternarPronto(meu); if (erro) OBR.notification.show(erro, "WARNING"); } }, meu ? "Largar o dado" : `Rolar iniciativa${dado ? ` · ${escreverDado(dado)}` : ""}`),
+    meu ? h("p", { class: "mudo" }, ini?.ativo ? "Esperando o mestre deixar você entrar." : "Dado na mão. Esperando o mestre iniciar.") : null);
+  const falta = faltaAnimacao(ini);
+  if (falta) setTimeout(redesenhar, falta + 60);
+  if (!ini?.ativo || falta) {
+    const outros = estado.jogadores.map(p => [p, lerPronto(p.metadata)]).filter(([, x]) => x);
+    return h("div", {}, falta ? h("p", { class: "vazio mudo" }, "Rolando a iniciativa…") : [rolar, outros.length ? [titulo("Prontos"), h("div", { class: "roletinhas" }, outros.map(([p, x]) => roletinha(x.nome || p.name, p.color, x.dado)))] : null]);
+  }
   const i = ini.combatentes.findIndex(c => c.id === ini.vez), eu = ini.combatentes.findIndex(c => c.jogador === estado.meuId);
-  const falta = i >= 0 && eu >= 0 ? (eu - i + ini.combatentes.length) % ini.combatentes.length : -1;
+  const ate = i >= 0 && eu >= 0 ? (eu - i + ini.combatentes.length) % ini.combatentes.length : -1;
   return h("div", {},
     minhaVez() ? h("div", { class: "sua-vez" }, "É a sua vez") : null,
-    contador(ini),
-    ini.vez === "?" ? h("p", { class: "nota" }, "Agora é a vez de alguém que você ainda não percebeu…") : falta > 0 ? h("p", { class: "nota" }, falta === 1 ? "Você é o próximo da lista." : `Faltam ${falta} até a sua vez, contando só quem você vê.`) : null,
-    h("ul", { class: "ini-lista" }, ini.combatentes.map((c, k) => h("li", { "data-vez": c.id === ini.vez },
+    contador(ini.ciclo, ini.turno, ini.total),
+    rolar,
+    ini.vez === "?" ? h("p", { class: "nota" }, "Agora é a vez de alguém que você ainda não percebeu…") : ate > 0 ? h("p", { class: "nota" }, ate === 1 ? "Você é o próximo da lista." : `Faltam ${ate} até a sua vez, contando só quem você vê.`) : null,
+    h("ul", { class: "ini-lista" }, ini.combatentes.map((c, k) => h("li", { "data-vez": c.id === ini.vez, style: { "--cor": corSegura(c.cor) } },
       h("span", { class: "marca" }, c.id === ini.vez ? "▶" : k + 1),
       h("span", { class: "nome" }, c.nome),
+      c.valor != null ? h("b", { class: "mudo" }, c.valor) : null,
       c.jogador === estado.meuId ? h("span", { class: "voce" }, "você") : null))));
 }
 

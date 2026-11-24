@@ -1,8 +1,8 @@
-import { HISTORICO, VERSAO, guardar, ler, corSegura } from "./shared.js?v=15";
-import { h, icone, botaoIcone, estado, rascunho, ui, redesenhar, details, chip, titulo, campo, seletor, confirmar } from "./nucleo.js?v=15";
-import { ALVOS_ROLAGEM, CHAVE_ALVO, CHAVE_ROLAGENS, CHAVE_SISTEMA, SISTEMAS, rolar, ultimas, notacaoDoAtributo } from "./dados.js?v=15";
-import { mudarRecurso, desfazer, retirarFicha, novaEntradaArquivo, semFicha, retrato, trocarRetrato } from "./minha.js?v=15";
-import { FILTROS, formAberto, abrirFormSkill, formularioSkill, restaurarOcultas, skillsVisiveis, skillsFiltradas, listaSkills } from "./skills.js?v=15";
+import { HISTORICO, VERSAO, guardar, ler, corSegura } from "./shared.js?v=16";
+import { h, icone, botaoIcone, estado, rascunho, ui, redesenhar, details, chip, titulo, campo, seletor, confirmar } from "./nucleo.js?v=16";
+import { ALVOS_ROLAGEM, CHAVE_ALVO, CHAVE_ROLAGENS, CHAVE_SISTEMA, SISTEMAS, rolar, ultimas, notacaoDoAtributo } from "./dados.js?v=16";
+import { mudarRecurso, desfazer, retirarFicha, novaEntradaArquivo, semFicha, retrato, trocarRetrato } from "./minha.js?v=16";
+import { FILTROS, formAberto, abrirFormSkill, formularioSkill, restaurarOcultas, skillsVisiveis, skillsFiltradas, listaSkills } from "./skills.js?v=16";
 
 // ── recursos ──────────────────────────────────────────────────
 const ultimoValor = new Map();      // recurso -> valor da última tela, para perceber o que mudou

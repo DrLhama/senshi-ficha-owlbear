@@ -1,10 +1,11 @@
-import { OBR, LOCAL, CHAVE_INI, LOCAL_INI, guardar, ler, lerFicha, cabecalhoDe, corSegura } from "./shared.js?v=15";
-import { ABAS, ALTURA_MIN, CONFIG, abasDe, lerJanelas, mudarJanela, tirarJanela, abrirPopover, novaJanela, limitar, tela, endereco, canal, coberta } from "./janelas.js?v=15";
-import { ID, $, h, icone, botaoIcone, estado, rolagens, salvarUi, definirPintura, redesenhar } from "./nucleo.js?v=15";
-import { escutarDados } from "./dados.js?v=15";
-import { aplicarMinhaFicha, instalarSoltar } from "./minha.js?v=15";
-import { painelAtributos, painelRecursos, painelSkills, painelDados, painelNotas } from "./paineis.js?v=15";
-import { INI_VAZIA, painelMesa, painelJogador, painelIniciativa, minhaVez } from "./mestre.js?v=15";
+import { OBR, LOCAL, CHAVE_INI, LOCAL_INI, guardar, ler, lerFicha, cabecalhoDe, corSegura } from "./shared.js?v=16";
+import { ABAS, ALTURA_MIN, CONFIG, abasDe, lerJanelas, mudarJanela, tirarJanela, abrirPopover, novaJanela, limitar, tela, endereco, canal, coberta } from "./janelas.js?v=16";
+import { ID, $, h, icone, botaoIcone, estado, rolagens, salvarUi, definirPintura, redesenhar } from "./nucleo.js?v=16";
+import { escutarDados } from "./dados.js?v=16";
+import { aplicarMinhaFicha, instalarSoltar } from "./minha.js?v=16";
+import { painelAtributos, painelRecursos, painelSkills, painelDados, painelNotas } from "./paineis.js?v=16";
+import { painelMesa, painelJogador, painelIniciativa, minhaVez } from "./mestre.js?v=16";
+import { INI_VAZIA, lerPronto } from "./iniciativa.js?v=16";
 
 const PAINEIS = { ficha: painelAtributos, recursos: painelRecursos, skills: painelSkills, dados: painelDados, iniciativa: painelIniciativa, notas: painelNotas, mesa: painelMesa, jogador: painelJogador };
 const janela = () => lerJanelas()[ID] || {};
@@ -191,10 +192,12 @@ OBR.onReady(async () => {
   estado.iniPublica = sala[CHAVE_INI] || null;
   estado.iniMestre = estado.souGM ? (ler(LOCAL_INI) || INI_VAZIA()) : null;
   estado.jogadores = jogadores;
+  estado.meuPronto = lerPronto(meta);
   const j = janela();
   estado.alvo = j.alvo || "";
   estado.aba = abasDe(estado.souGM, estado.alvo).includes(j.aba) ? j.aba : "ficha";
 
+  OBR.player.onChange(p => { const antes = JSON.stringify(estado.meuPronto); estado.meuPronto = lerPronto(p.metadata); if (JSON.stringify(estado.meuPronto) !== antes) redesenhar(); });
   OBR.party.onChange(lista => { estado.jogadores = lista; redesenhar(); });
   OBR.room.onMetadataChange(m => { estado.iniPublica = m[CHAVE_INI] || null; redesenhar(); });
   // tudo o que outra janela (ou o fundo) grava aparece aqui também

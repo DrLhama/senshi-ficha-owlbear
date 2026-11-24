@@ -6,8 +6,8 @@
 <body><span>Abrindo janela…</span>
 <script type="module">
   // O painel do ícone só serve de gatilho: abre uma janela nova e sai da frente.
-  import { OBR } from "./shared.js?v=15";
-  import { novaJanela } from "./janelas.js?v=15";
+  import { OBR } from "./shared.js?v=16";
+  import { novaJanela } from "./janelas.js?v=16";
   let ultimo = 0;
   async function abrir() {
     if (Date.now() - ultimo < 500) return;               // abrir e "já estava aberto" chegam juntos
