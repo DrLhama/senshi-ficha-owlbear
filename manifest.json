@@ -1,16 +1,16 @@
 {
   "name": "Senshi · Ficha e Iniciativa",
-  "version": "3.2.0",
+  "version": "3.5.0",
   "manifest_version": 1,
   "description": "Janelas livres com a ficha, os recursos, as skills, a iniciativa e a mesa. Cada clique no ícone abre mais uma.",
   "author": "Mesa Odisseia",
   "homepage_url": "https://drlhama.github.io/senshi-ficha-owlbear/",
-  "icon": "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg?v=11",
-  "background_url": "https://drlhama.github.io/senshi-ficha-owlbear/background.html?v=11",
+  "icon": "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg?v=14",
+  "background_url": "https://drlhama.github.io/senshi-ficha-owlbear/background.html?v=14",
   "action": {
     "title": "Senshi Fichas",
-    "icon": "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg?v=11",
-    "popover": "https://drlhama.github.io/senshi-ficha-owlbear/abrir.html?v=11",
+    "icon": "https://drlhama.github.io/senshi-ficha-owlbear/icon.svg?v=14",
+    "popover": "https://drlhama.github.io/senshi-ficha-owlbear/abrir.html?v=14",
     "width": 190,
     "height": 52
   }

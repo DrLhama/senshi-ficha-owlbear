@@ -1,5 +1,5 @@
-import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=11";
-import { estado, redesenhar } from "./nucleo.js?v=11";
+import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=14";
+import { estado, redesenhar } from "./nucleo.js?v=14";
 
 // ── rolagens pelos Senshi Dados ───────────────────────────────
 // A outra extensão recebe o pedido, abre com os dados prontos e devolve um resultado por linha.
@@ -13,10 +13,10 @@ const pedidos = new Map();                 // id do pedido -> { chave, partes }
 /** O que os Senshi Dados sabem rolar: dados e números somados (as mesmas regras de lá). */
 export function suportada(formula) {
   const s = String(formula).toLowerCase().replace(/\s+/g, "");
-  if (!/^[+-]?(\d*d\d+|\d+)([+-](\d*d\d+|\d+))*$/.test(s) || /-\d*d/.test(s)) return false;
-  const dados = [...s.matchAll(/(\d*)d(\d+)/g)].map(m => [Number(m[1] || 1), Number(m[2])]);
+  if (!/^[+-]?(\d*[de]\d+|\d+)([+-](\d*[de]\d+|\d+))*$/.test(s) || /-\d*[de]/.test(s)) return false;
+  const dados = [...s.matchAll(/(\d*)([de])(\d+)/g)].map(m => [Number(m[1] || 1), Number(m[3]), m[2]]);
   const soma = l => l.reduce((n, [q]) => n + q, 0);
-  return dados.length > 0 && dados.every(([q, f]) => q >= 1 && q <= 50 && f >= 2 && f <= 100000) && soma(dados) <= 60 && soma(dados.filter(([, f]) => f === 100 || f >= 1000)) <= 6;
+  return dados.length > 0 && dados.every(([q, f]) => q >= 1 && q <= 50 && f >= 2 && f <= 100000) && soma(dados) <= 60 && soma(dados.filter(([, f, l]) => l === "d" && f >= 100)) <= 6 && soma(dados.filter(([, , l]) => l === "e")) <= 3;
 }
 
 async function pedirSenshiDados(notacao, chave, nome) {
@@ -105,7 +105,7 @@ export async function rolar(notacao, chave, nome = "") {
   pendentes.set(rollId, { chave, nome, notacao });
   await OBR.broadcast.sendMessage("dice-plus/roll-request", {
     rollId, playerId: OBR.player.id, playerName: await OBR.player.getName(),
-    rollTarget: ler(CHAVE_ALVO) || "everyone", diceNotation: notacao, showResults: true, timestamp: Date.now(), source: SOURCE,
+    rollTarget: ler(CHAVE_ALVO) || "everyone", diceNotation: notacao.replace(/(\d)e(\d)/gi, "$1d$2"), showResults: true, timestamp: Date.now(), source: SOURCE,
     dice: { default: estiloDados() },
   }, { destination: "ALL" });
 }
@@ -129,5 +129,11 @@ export function escutarDados() {
   });
 }
 
-/** "D200" da ficha vira "1d200"; dados que não são dN (entidades) não rolam. */
-export const notacaoDoAtributo = dado => { const m = /^(\d*)\s*d(\d+)$/i.exec(String(dado).trim()); return m ? `${m[1] || 1}d${m[2]}` : null; };
+/** Teste = dado + atributo: "D200" com 142 vira "1d200+142". O dado de Entidade ("D5+1") já traz o bônus dele. */
+export function notacaoDoAtributo({ dado, valor }) {
+  const m = /^(\d*)\s*d(\d+)\s*([+-]\s*\d+)?$/i.exec(String(dado).trim());
+  if (!m) return null;
+  const bonus = m[3] ? Number(m[3].replace(/\s/g, "")) : Math.floor(Number(valor) || 0);
+  // o dado de Entidade é outro dado: "e" abre a invocação
+  return `${m[1] || 1}${m[3] ? "e" : "d"}${m[2]}${bonus ? (bonus > 0 ? "+" : "") + bonus : ""}`;
+}

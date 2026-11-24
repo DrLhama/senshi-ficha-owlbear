@@ -1,8 +1,8 @@
-import { HISTORICO, VERSAO, guardar, ler, corSegura } from "./shared.js?v=11";
-import { h, icone, botaoIcone, estado, rascunho, ui, redesenhar, details, chip, titulo, campo, seletor, confirmar } from "./nucleo.js?v=11";
-import { ALVOS_ROLAGEM, CHAVE_ALVO, CHAVE_ROLAGENS, CHAVE_SISTEMA, SISTEMAS, rolar, ultimas, notacaoDoAtributo } from "./dados.js?v=11";
-import { mudarRecurso, desfazer, retirarFicha, novaEntradaArquivo, semFicha, retrato, trocarRetrato } from "./minha.js?v=11";
-import { FILTROS, formAberto, abrirFormSkill, formularioSkill, restaurarOcultas, skillsVisiveis, skillsFiltradas, listaSkills } from "./skills.js?v=11";
+import { HISTORICO, VERSAO, guardar, ler, corSegura } from "./shared.js?v=14";
+import { h, icone, botaoIcone, estado, rascunho, ui, redesenhar, details, chip, titulo, campo, seletor, confirmar } from "./nucleo.js?v=14";
+import { ALVOS_ROLAGEM, CHAVE_ALVO, CHAVE_ROLAGENS, CHAVE_SISTEMA, SISTEMAS, rolar, ultimas, notacaoDoAtributo } from "./dados.js?v=14";
+import { mudarRecurso, desfazer, retirarFicha, novaEntradaArquivo, semFicha, retrato, trocarRetrato } from "./minha.js?v=14";
+import { FILTROS, formAberto, abrirFormSkill, formularioSkill, restaurarOcultas, skillsVisiveis, skillsFiltradas, listaSkills } from "./skills.js?v=14";
 
 // ── recursos ──────────────────────────────────────────────────
 const ultimoValor = new Map();      // recurso -> valor da última tela, para perceber o que mudou
@@ -93,7 +93,7 @@ function resultadosDosAtributos(f) {
 
 export const blocoAtributos = (f, rola) => [
   h("div", { class: "attrs" }, f.atributos.map(a => {
-    const nota = rola && notacaoDoAtributo(a.dado), chave = "attr:" + a.key;
+    const nota = rola && notacaoDoAtributo(a), chave = "attr:" + a.key;
     const miolo = [h("small", {}, a.nome), h("b", {}, a.valor), h("i", {}, a.dado)];
     const estilo = { "--cor": corSegura(a.cor, "var(--tema)") };
     return nota
@@ -156,11 +156,11 @@ export function painelDados() {
   const f = estado.ficha, hist = ler(CHAVE_ROLAGENS) || [];
   const rolarTexto = (nota, nome) => rolar(nota, "livre", nome);
   const enviar = () => { const t = (rascunho["dados"] || "").trim(); if (t) rolarTexto(t, ""); };
-  const attrs = (f?.atributos || []).map(a => [a, notacaoDoAtributo(a.dado)]).filter(([, n]) => n);
+  const attrs = (f?.atributos || []).map(a => [a, notacaoDoAtributo(a)]).filter(([, n]) => n);
   const corpo = [
     h("div", { class: "linha" }, campo("dados", { placeholder: "1d20+5 #Ataque, 2d8 #Dano", "aria-label": "Fórmula de dados", spellcheck: "false", onkeydown: e => { if (e.key === "Enter") enviar(); } }), h("button", { class: "forte", onclick: enviar }, "Rolar")),
     h("div", { class: "filtros" }, RAPIDOS.map(d => h("button", { onclick: () => rolarTexto(d, d.slice(1)) }, d.slice(1))), seletorQuemVe()),
-    attrs.length ? h("div", { class: "chips" }, attrs.map(([a, n]) => h("button", { class: "chip", style: { "--cor": corSegura(a.cor) }, title: `Rolar ${n}`, onclick: () => rolarTexto(n, a.nome) }, a.nome, " ", h("b", {}, a.dado)))) : null,
+    attrs.length ? h("div", { class: "chips" }, attrs.map(([a, n]) => h("button", { class: "chip", style: { "--cor": corSegura(a.cor) }, title: `Rolar ${n}`, onclick: () => rolarTexto(n, a.nome) }, a.nome, " ", h("b", {}, n.replace(/^1d/, "D").replace(/^1e/, "Entidade D"))))) : null,
     resultadoLivre("livre"),
     titulo("Últimas rolagens", hist.length ? h("button", { class: "link", onclick: () => { guardar(CHAVE_ROLAGENS, []); redesenhar(); } }, "Limpar") : null),
     hist.length ? h("ul", { class: "historico rolagens" }, hist.map(x => h("li", {}, h("b", {}, x.total),
