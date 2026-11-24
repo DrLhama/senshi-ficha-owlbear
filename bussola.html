@@ -15,8 +15,9 @@
   .cel b { max-width:108px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 14px var(--serifa); }
   .cel i { font:700 21px/1 var(--serifa); font-style:normal; color:var(--cor); text-shadow:0 0 14px var(--cor),0 1px 4px #000; }
   .cel::after { content:""; position:absolute; left:0; right:0; bottom:0; height:9px; background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--cor) 75%,#fff) 0 1px,transparent 1px 14.5px); opacity:.75; -webkit-mask:linear-gradient(90deg,#000 1px,rgba(0,0,0,.45) 1px); }
-  .cel.agora { opacity:1; transform:scale(1.12); } .cel.agora b { color:var(--ouro); }
+  .cel.agora { opacity:1; transform:scale(1.12); } .cel.agora b:not(.ficha) { color:var(--ouro); }
   .cel.agora::before { content:""; position:absolute; inset:-4px 4px 4px; z-index:-1; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--cor) 55%,transparent),transparent); animation:respira 2.2s ease-in-out infinite; }
+  .cel b.ficha { color:transparent; background:linear-gradient(90deg,color-mix(in srgb,var(--cor) 92%,#fff),color-mix(in srgb,var(--cor2) 92%,#fff)); -webkit-background-clip:text; background-clip:text; text-shadow:none; filter:drop-shadow(0 1px 2px #000) drop-shadow(0 0 5px color-mix(in srgb,var(--cor) 70%,transparent)); }
   .cel.oculto b { font-style:italic; opacity:.75; }
   .cel .ciclo { position:absolute; left:-1px; top:-4px; bottom:0; border-left:2px solid var(--ouro); padding-left:5px; font:600 10px system-ui; letter-spacing:.1em; color:var(--ouro); text-transform:uppercase; white-space:nowrap; }
   #ponteiro { position:absolute; left:50%; top:2px; width:0; height:0; margin-left:-8px; border:8px solid transparent; border-top:10px solid var(--ouro); filter:drop-shadow(0 0 6px #b86bff); z-index:2; }
@@ -34,10 +35,10 @@
 <div id="corpo"></div>
 <script type="module">
   // A bússola: fica presa no alto da tela de todos enquanto há combate. Qualquer um avança ou volta; quem muda é o fundo do mestre.
-  import { OBR, CHAVE_INI, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=16";
-  import { h } from "./nucleo.js?v=16";
-  import { canal } from "./janelas.js?v=16";
-  import { CANAL_PASSO, alternarPronto, dadoDaFicha, escreverDado, iniciarIniciativa, lerPronto, novoId, INI_VAZIA } from "./iniciativa.js?v=16";
+  import { OBR, CHAVE_INI, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=17";
+  import { h } from "./nucleo.js?v=17";
+  import { canal } from "./janelas.js?v=17";
+  import { CANAL_PASSO, alternarPronto, dadoDaFicha, escreverDado, iniciarIniciativa, lerPronto, novoId, INI_VAZIA } from "./iniciativa.js?v=17";
 
   const LARGURA = 116, LADO = 6, corpo = document.getElementById("corpo");
   let souGM = false, publica = null, jogadores = [], meuPronto = null, celulas = new Map(), assinatura = "", trilho = null;
@@ -56,7 +57,7 @@
     const n = ini.combatentes.filter(c => !prontos.some(([p]) => p.id === c.jogador)).length + prontos.length;
     corpo.replaceChildren(h("div", { id: "chamada" }, h("b", {}, "Iniciativa"),
       meuPronto ? h("span", { class: "pessoa", style: { "--cor": "#8fffc0" } }, h("span", {}, "Você"), h("small", {}, escreverDado(meuPronto.dado))) : null,
-      prontos.map(([p, x]) => h("span", { class: "pessoa", style: { "--cor": corSegura(p.color) } }, h("span", {}, x.nome || p.name), h("small", {}, escreverDado(x.dado)))),
+      prontos.map(([p, x]) => h("span", { class: "pessoa", style: { "--cor": corSegura(x.cor || p.color) } }, h("span", {}, x.nome || p.name), h("small", {}, escreverDado(x.dado)))),
       souGM
         ? h("button", { disabled: !n, onclick: () => iniciarIniciativa(ini, jogadores).catch(() => OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR")) }, `Iniciar iniciativa (${n})`)
         : h("button", { class: meuPronto ? "leve" : "", onclick: async () => { const erro = await alternarPronto(meuPronto); if (erro) OBR.notification.show(erro, "WARNING"); } }, meuPronto ? "Largar o dado" : `Rolar iniciativa${dado ? " · " + escreverDado(dado) : ""}`)));
@@ -82,7 +83,7 @@
         h("div", { id: "janela" }, h("div", { id: "ponteiro" }), trilho, h("div", { id: "pe", role: "status" }, h("span", {}), h("button", { onclick: descer, title: "Mudar a altura da bússola", "aria-label": "Mudar a altura da bússola" }, "⇕"))),
         h("button", { class: "seta", onclick: () => passo(1), "aria-label": "Avançar um turno", title: "Avançar um turno" }, "▶"));
     }
-    const i = Math.max(0, l.findIndex(c => c.id === vez)), onde = (ciclo - 1) * n + i, nova = l.map(c => [c.id, c.nome, c.valor, c.cor, c.visivel, c.oculta].join()).join("|");
+    const i = Math.max(0, l.findIndex(c => c.id === vez)), onde = (ciclo - 1) * n + i, nova = l.map(c => [c.id, c.nome, c.valor, c.cor, c.cor2, c.visivel, c.oculta].join()).join("|");
     const seco = nova !== assinatura;
     if (seco) { trilho.replaceChildren(); celulas.clear(); assinatura = nova; }
     trilho.classList.toggle("seco", seco);
@@ -90,8 +91,8 @@
     for (let k = Math.max(0, onde - LADO); k <= onde + LADO; k++) {
       if (!celulas.has(k)) {
         const c = l[k % n];
-        const el = h("div", { class: "cel" + (c.visivel === false ? " oculto" : ""), style: { left: k * LARGURA - LARGURA / 2 + "px", "--cor": corSegura(c.cor, "#b9b2c8") } },
-          k % n === 0 ? h("span", { class: "ciclo" }, "Ciclo " + (k / n + 1)) : null, h("b", {}, c.nome), c.valor != null ? h("i", {}, Number(c.valor).toLocaleString("pt-BR")) : null);
+        const el = h("div", { class: "cel" + (c.visivel === false ? " oculto" : ""), style: { left: k * LARGURA - LARGURA / 2 + "px", "--cor": corSegura(c.cor, "#b9b2c8"), "--cor2": corSegura(c.cor2, "#b9b2c8") } },
+          k % n === 0 ? h("span", { class: "ciclo" }, "Ciclo " + (k / n + 1)) : null, h("b", { class: c.cor2 ? "ficha" : "" }, c.nome), c.valor != null ? h("i", {}, Number(c.valor).toLocaleString("pt-BR")) : null);
         trilho.append(el);
         celulas.set(k, el);
       }
@@ -109,7 +110,7 @@
     souGM = papel === "GM"; publica = sala[CHAVE_INI]; jogadores = outros; meuPronto = lerPronto(meta);
     OBR.room.onMetadataChange(m => { publica = m[CHAVE_INI]; pintar(); });
     OBR.party.onChange(l => { jogadores = l; if (!publica?.ativo) pintar(); });
-    OBR.player.onChange(p => { meuPronto = lerPronto(p.metadata); if (!publica?.ativo) pintar(); });
+    OBR.player.onChange(p => { const era = souGM; souGM = p.role === "GM"; meuPronto = lerPronto(p.metadata); if (!publica?.ativo || era !== souGM) pintar(); });
     pintar();
   });
 </script>

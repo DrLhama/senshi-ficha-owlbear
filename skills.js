@@ -1,7 +1,7 @@
-import { ler, guardar, lerCombo, registrar } from "./shared.js?v=16";
-import { h, icone, rascunho, ui, redesenhar, details, chip, campo, area, seletor, confirmar } from "./nucleo.js?v=16";
-import { rolar, ultimas, gravarResultado } from "./dados.js?v=16";
-import { aplicarMinhaFicha } from "./minha.js?v=16";
+import { ler, guardar, lerCombo, registrar } from "./shared.js?v=17";
+import { h, icone, rascunho, ui, redesenhar, details, chip, campo, area, seletor, confirmar } from "./nucleo.js?v=17";
+import { rolar, ultimas, gravarResultado } from "./dados.js?v=17";
+import { aplicarMinhaFicha } from "./minha.js?v=17";
 
 // ── skills ────────────────────────────────────────────────────
 /** Cada linha do combo vira um botão para rolar só ela (sem pagar custo). O botão Usar rola o combo inteiro. */

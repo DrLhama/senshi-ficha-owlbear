@@ -1,8 +1,8 @@
-import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=16";
-import { INI_VAZIA, avancar, alternarPronto, combatenteDe, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=16";
-import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=16";
-import { barra, fichaView } from "./paineis.js?v=16";
-import { novaJanela } from "./janelas.js?v=16";
+import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=17";
+import { INI_VAZIA, avancar, alternarPronto, combatenteDe, coresDaFicha, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=17";
+import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=17";
+import { barra, fichaView } from "./paineis.js?v=17";
+import { novaJanela } from "./janelas.js?v=17";
 
 // ── mesa (mestre) ─────────────────────────────────────────────
 function pedirAjuste(jogador, rc, expr) {
@@ -91,6 +91,9 @@ function contador(ciclo, turno, total) {
 /** A roleta na mão de quem está pronto. */
 const roletinha = (nome, cor, dado) => h("div", { class: "roletinha", style: { "--cor": corSegura(cor) } }, h("i", {}, h("b", {}, "d" + dado.f)), h("span", {}, nome), h("small", {}, dado.b ? (dado.b > 0 ? "+" : "") + dado.b : ""));
 
+/** O nome do personagem de jogador leva as cores da ficha dele. */
+const nomeDe = c => c.cor2 ? h("span", { class: "nome-ficha", style: { "--cor": corSegura(c.cor), "--cor2": corSegura(c.cor2) } }, c.nome) : c.nome;
+
 let arrastando = null;
 function painelMestre() {
   const ini = { ...INI_VAZIA(), ...estado.iniMestre };
@@ -118,7 +121,7 @@ function painelMestre() {
     const novos = [];
     for (const p of semClicar) {
       const f = await fichaDe(p), d = dadoDaFicha(f);
-      if (d) novos.push(combatenteDe(p, { nome: f.nome, ...d }));
+      if (d) novos.push(combatenteDe(p, { nome: f.nome, ...d, ...coresDaFicha(f) }));
     }
     if (novos.length < semClicar.length) OBR.notification.show("Há ficha sem Agilidade: peça para o jogador rolar.", "WARNING");
     juntar(novos);
@@ -150,7 +153,7 @@ function painelMestre() {
     },
     h("button", { class: "marca", title: "Dar a vez a este combatente", onclick: () => mudar({ vez: c.id }), "aria-label": `Dar a vez a ${c.nome}` }, ini.ativo && c.id === ini.vez ? "▶" : i + 1),
     ini.ativo ? valor : dado,
-    h("span", { class: "nome", title: c.nome }, c.nome, vida ? h("span", { class: "fio", style: { "--p": (vida.max > 0 ? Math.max(0, Math.min(100, vida.atual / vida.max * 100)) : 0) + "%", "--cor": corSegura(vida.cor) }, title: `${vida.nome} ${vida.atual}/${vida.max}` }) : null),
+    h("span", { class: "nome", title: c.nome }, nomeDe(c), vida ? h("span", { class: "fio", style: { "--p": (vida.max > 0 ? Math.max(0, Math.min(100, vida.atual / vida.max * 100)) : 0) + "%", "--cor": corSegura(vida.cor) }, title: `${vida.nome} ${vida.atual}/${vida.max}` }) : null),
     p && cab ? botaoIcone("jogador", "Abrir a ficha", () => abrirFicha(p.id)) : null,
     c.jogador ? null : h("button", { class: "ico", title: c.oculta ? "Bônus escondido: os jogadores veem só o número do dado. Clique para mostrar." : "Bônus à mostra. Clique para esconder.", "aria-label": c.oculta ? `Mostrar o bônus de ${c.nome}` : `Esconder o bônus de ${c.nome}`, onclick: () => por(c, { oculta: !c.oculta }) }, c.oculta ? "🙈" : "±"),
     h("button", { class: "ico", title: c.visivel ? "Visível para os jogadores. Clique para ocultar." : "Oculto dos jogadores. Clique para mostrar.", "aria-label": c.visivel ? `Ocultar ${c.nome}` : `Mostrar ${c.nome}`, onclick: () => por(c, { visivel: !c.visivel }) }, c.visivel ? "👁" : "—"),
@@ -166,7 +169,7 @@ function painelMestre() {
           // os jogadores rolam de novo no próximo combate; os mobs ficam para reaproveitar
           confirmar("ini-fim", "Encerrar", () => salvarIni({ ...INI_VAZIA(), combatentes: lista.filter(c => !c.jogador).map(({ valor, base, ...c }) => c) })))]
       : h("div", { class: "ini-sala" },
-        prontos.length ? h("div", { class: "roletinhas" }, prontos.map(([p, x]) => roletinha(x.nome || p.name, p.color, x.dado))) : h("p", { class: "mudo" }, "Ninguém está com o dado na mão ainda."),
+        prontos.length ? h("div", { class: "roletinhas" }, prontos.map(([p, x]) => roletinha(x.nome || p.name, x.cor || p.color, x.dado))) : h("p", { class: "mudo" }, "Ninguém está com o dado na mão ainda."),
         h("div", { class: "linha" },
           h("button", { "aria-pressed": String(!!ini.chamada), title: "Mostra o botão de rolar no alto da tela de todos", onclick: () => mudar({ chamada: !ini.chamada }) }, ini.chamada ? "Chamando…" : "Chamar jogadores"),
           h("button", { class: "forte cresce", onclick: iniciar, disabled: !prontos.length && !lista.length }, `Iniciar iniciativa (${lista.length + esperando.length})`))),
@@ -193,7 +196,7 @@ function painelDoJogador() {
   if (falta) setTimeout(redesenhar, falta + 60);
   if (!ini?.ativo || falta) {
     const outros = estado.jogadores.map(p => [p, lerPronto(p.metadata)]).filter(([, x]) => x);
-    return h("div", {}, falta ? h("p", { class: "vazio mudo" }, "Rolando a iniciativa…") : [rolar, outros.length ? [titulo("Prontos"), h("div", { class: "roletinhas" }, outros.map(([p, x]) => roletinha(x.nome || p.name, p.color, x.dado)))] : null]);
+    return h("div", {}, falta ? h("p", { class: "vazio mudo" }, "Rolando a iniciativa…") : [rolar, outros.length ? [titulo("Prontos"), h("div", { class: "roletinhas" }, outros.map(([p, x]) => roletinha(x.nome || p.name, x.cor || p.color, x.dado)))] : null]);
   }
   const i = ini.combatentes.findIndex(c => c.id === ini.vez), eu = ini.combatentes.findIndex(c => c.jogador === estado.meuId);
   const ate = i >= 0 && eu >= 0 ? (eu - i + ini.combatentes.length) % ini.combatentes.length : -1;
@@ -204,7 +207,7 @@ function painelDoJogador() {
     ini.vez === "?" ? h("p", { class: "nota" }, "Agora é a vez de alguém que você ainda não percebeu…") : ate > 0 ? h("p", { class: "nota" }, ate === 1 ? "Você é o próximo da lista." : `Faltam ${ate} até a sua vez, contando só quem você vê.`) : null,
     h("ul", { class: "ini-lista" }, ini.combatentes.map((c, k) => h("li", { "data-vez": c.id === ini.vez, style: { "--cor": corSegura(c.cor) } },
       h("span", { class: "marca" }, c.id === ini.vez ? "▶" : k + 1),
-      h("span", { class: "nome" }, c.nome),
+      h("span", { class: "nome" }, nomeDe(c)),
       c.valor != null ? h("b", { class: "mudo" }, c.valor) : null,
       c.jogador === estado.meuId ? h("span", { class: "voce" }, "você") : null))));
 }

@@ -1,5 +1,5 @@
-import { OBR, CHAVE_INI, LOCAL, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=16";
-import { notacaoDoAtributo } from "./dados.js?v=16";
+import { OBR, CHAVE_INI, LOCAL, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=17";
+import { notacaoDoAtributo } from "./dados.js?v=17";
 
 /** As contas da iniciativa, sem desenho: usadas pela janela, pela bússola e pelo fundo. */
 export const CANAL_PASSO = "senshi.ini-passo";      // alguém clicou numa seta da bússola; quem muda é o fundo do mestre
@@ -21,16 +21,19 @@ export function avancar(ini, sentido) {
 }
 
 /** Guarda a lista completa no mestre e a parte pública na sala. */
-export function publicarIni(ini) {
+export async function publicarIni(ini) {
+  // só o mestre começa, muda ou encerra a iniciativa
+  if (await OBR.player.getRole() !== "GM") throw new Error("só o mestre muda a iniciativa");
   guardar(LOCAL_INI, ini);
   const i = indice(ini), vez = ini.combatentes[i];
   const publica = {
     ativo: ini.ativo, chamada: !!ini.chamada, rol: ini.rol || null, ciclo: ini.ciclo, turno: i + 1, total: ini.combatentes.length,
     vez: vez ? (vez.visivel ? vez.id : "?") : null,             // quem está oculto não aparece pelo nome
     lugar: ini.combatentes.slice(0, i).filter(c => c.visivel).length,
-    combatentes: ini.combatentes.filter(c => c.visivel).map(c => ({ id: c.id, nome: c.nome, jogador: c.jogador, cor: c.cor, valor: c.oculta ? c.base : c.valor })),
+    combatentes: ini.combatentes.filter(c => c.visivel).map(c => ({ id: c.id, nome: c.nome, jogador: c.jogador, cor: c.cor, cor2: c.cor2, valor: c.oculta ? c.base : c.valor })),
   };
-  return OBR.room.setMetadata({ [CHAVE_INI]: publica }).then(() => publica);
+  await OBR.room.setMetadata({ [CHAVE_INI]: publica });
+  return publica;
 }
 
 /** "d200+150", "+50" ou "50" (d100). Devolve { q, f, b } ou null. */
@@ -46,6 +49,18 @@ export function lerDado(texto) {
 const limitar = n => Math.max(-999999, Math.min(999999, Math.round(n) || 0));
 export const escreverDado = (d, semBonus) => `${d.q > 1 ? d.q : ""}d${d.f}${d.b && !semBonus ? (d.b > 0 ? "+" : "") + d.b : ""}`;
 
+/** A mesma cor, clara o bastante para se ler num fundo escuro: aviva e, se ainda for pouco, clareia. */
+export function legivel(cor) {
+  const hex = corSegura(cor).slice(1), cheio = hex.length < 6 ? [...hex.slice(0, 3)].map(c => c + c).join("") : hex.slice(0, 6);
+  let rgb = [0, 2, 4].map(i => parseInt(cheio.slice(i, i + 2), 16));
+  const luz = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255, topo = Math.max(...rgb, 1);
+  if (luz(rgb) < 0.55) rgb = rgb.map(v => v * 255 / topo);
+  while (luz(rgb) < 0.55) rgb = rgb.map(v => v + (255 - v) * 0.1 + 0.5);
+  return "#" + rgb.map(v => Math.min(255, Math.round(v)).toString(16).padStart(2, "0")).join("");
+}
+/** As cores do personagem, para o nome dele. */
+export const coresDaFicha = f => ({ cor: legivel(f?.cores?.tema), cor2: legivel(f?.cores?.secundaria || f?.cores?.tema) });
+
 /** Iniciativa = Agilidade (odisseia-sistema.md, 6.1); Reflexo desempata. */
 export function dadoDaFicha(f) {
   const a = f?.atributos?.find(x => /agil/i.test(x.key) || /agil/i.test(x.nome)) || f?.atributos?.find(x => /destreza|velocidade/i.test(x.nome));
@@ -59,14 +74,14 @@ export function lerPronto(meta) {
   const p = meta?.[PRONTO], d = p?.dado;
   if (!d || ![d.q, d.f, d.b].every(Number.isInteger)) return null;
   const dado = lerDado(`${d.q}d${d.f}${d.b < 0 ? d.b : "+" + d.b}`);
-  return dado && { nome: String(p.nome || "").slice(0, 40), dado, ref: Number(p.ref) || 0 };
+  return dado && { nome: String(p.nome || "").slice(0, 40), dado, ref: Number(p.ref) || 0, cor: p.cor ? legivel(p.cor) : "", cor2: p.cor2 ? legivel(p.cor2) : "" };
 }
 /** O jogador pega (ou larga) o dado de iniciativa. Devolve o erro, se houver. */
 export async function alternarPronto(pronto) {
   if (pronto) return void await OBR.player.setMetadata({ [PRONTO]: undefined });
   const ficha = ler(LOCAL), d = dadoDaFicha(ficha);
   if (!d) return ficha ? "Não achei a Agilidade na sua ficha." : "Carregue sua ficha antes.";
-  await OBR.player.setMetadata({ [PRONTO]: { nome: ficha.nome, ...d } });
+  await OBR.player.setMetadata({ [PRONTO]: { nome: ficha.nome, ...d, ...coresDaFicha(ficha) } });
 }
 
 const sorte = f => {
@@ -85,7 +100,7 @@ export const ordenar = l => [...l].sort((a, b) => (b.valor ?? -Infinity) - (a.va
 
 const TONS = ["#ff6b5e", "#ffb13d", "#b58cff", "#5fd0c5", "#ff7ac8", "#9ccf52", "#6fa8ff", "#e0c36a"];
 export const corDoNome = nome => TONS[[...String(nome).replace(/\s*\d+$/, "")].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7) % TONS.length];
-export const combatenteDe = (p, pronto) => ({ id: novoId(), nome: pronto.nome || p.name, cor: corSegura(p.color), visivel: true, jogador: p.id, dado: pronto.dado, ref: pronto.ref });
+export const combatenteDe = (p, pronto) => ({ id: novoId(), nome: pronto.nome || p.name, cor: pronto.cor || corSegura(p.color), cor2: pronto.cor2 || pronto.cor || corSegura(p.color), visivel: true, jogador: p.id, dado: pronto.dado, ref: pronto.ref });
 
 /** Junta quem está pronto, rola tudo, mostra a animação a todos e começa o combate em ordem. */
 export async function iniciarIniciativa(ini, jogadores) {
@@ -95,12 +110,12 @@ export async function iniciarIniciativa(ini, jogadores) {
     if (!pronto) continue;
     const i = lista.findIndex(c => c.jogador === p.id);
     if (i < 0) lista.push(combatenteDe(p, pronto));
-    else lista[i] = { ...lista[i], dado: pronto.dado, ref: pronto.ref, cor: corSegura(p.color) };
+    else lista[i] = { ...lista[i], ...combatenteDe(p, pronto), id: lista[i].id, visivel: lista[i].visivel };
   }
   if (!lista.length) return null;
   const combatentes = ordenar(lista.map(rolar)), rol = { id: novoId(), t: Date.now() };
   const nova = { ...ini, ativo: true, chamada: false, ciclo: 1, vez: combatentes[0].id, combatentes, rol };
-  const lados = combatentes.filter(c => c.visivel).slice(0, MAX_LADOS).map(c => ({ nome: c.nome, cor: corSegura(c.cor), rotulo: "", faces: c.dado ? c.dado.q * c.dado.f : 0, base: c.base, bonus: c.oculta ? null : c.dado?.b || 0, nat: 0 }));
+  const lados = combatentes.filter(c => c.visivel).slice(0, MAX_LADOS).map(c => ({ nome: c.nome, cor: corSegura(c.cor), ...(c.cor2 && { cor2: corSegura(c.cor2) }), rotulo: "", faces: c.dado ? c.dado.q * c.dado.f : 0, base: c.base, bonus: c.oculta ? null : c.dado?.b || 0, nat: 0 }));
   await publicarIni(nova);
   if (lados.length) await OBR.broadcast.sendMessage(CONFRONTO, { id: rol.id, modo: "iniciativa", lados, rapido: false }, { destination: "ALL" });
   return nova;
