@@ -1,0 +1,15 @@
+Senshi - Ficha e Iniciativa (extensao do Owlbear Rodeo)
+
+Esta pasta e o repositorio https://github.com/DrLhama/senshi-ficha-owlbear
+Link da extensao: https://drlhama.github.io/senshi-ficha-owlbear/manifest.json
+
+abrir.html       clique no icone: abre uma janela nova
+app.html/js/css  a janela com as abas
+janelas.js       onde ficam as janelas (abrir, organizar, fechar)
+arrasto.html     moldura que aparece ao arrastar uma janela
+background.html  fica ligado: ajustes do mestre, aviso da vez, reabrir janelas
+paineis.js       Ficha, Recursos, Skills, Dados e Notas
+mestre.js        Mesa, ficha de jogador e Iniciativa
+skills.js, dados.js, minha.js, nucleo.js, shared.js, obr.js (SDK do Owlbear)
+
+Ao mudar algo: trocar ?v=9 por ?v=10 em todos os arquivos e VERSAO em shared.js.

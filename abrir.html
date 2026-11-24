@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Senshi · abrir</title>
+<style>
+  html,body { margin:0; height:100%; background:#0d0d14; color:#b9b9c6; font:13px system-ui,"Segoe UI",sans-serif; display:grid; place-items:center; overflow:hidden; }
+</style></head>
+<body><span>Abrindo janela…</span>
+<script type="module">
+  // O painel do ícone só serve de gatilho: abre uma janela nova e sai da frente.
+  import { OBR } from "./shared.js?v=10";
+  import { novaJanela } from "./janelas.js?v=10";
+  let ultimo = 0;
+  async function abrir() {
+    if (Date.now() - ultimo < 500) return;               // abrir e "já estava aberto" chegam juntos
+    ultimo = Date.now();
+    try { await novaJanela({ souGM: (await OBR.player.getRole()) === "GM" }); }
+    finally { await OBR.action.close(); }
+  }
+  OBR.onReady(async () => {
+    OBR.action.onOpenChange(aberto => { if (aberto) abrir(); });
+    if (await OBR.action.isOpen()) abrir();
+  });
+</script>
+</body></html>

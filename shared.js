@@ -1,6 +1,7 @@
-import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
+import OBR from "./obr.js?v=10";
 
 export { OBR };
+export const VERSAO = "10";
 export const CHAVE = "senshi/f";                  // metadados do jogador: cabeçalho + pedaços da ficha
 export const LOCAL = "senshi/ficha";              // cópia completa, só no navegador do jogador
 export const CANAL_AJUSTE = "senshi.ajuste";      // o mestre pede ao jogador para mudar um recurso
@@ -67,18 +68,6 @@ export function lerCombo(texto) {
   });
 }
 
-/** Visuais prontos para os dados do Dice+ (só os campos livres do material padrão). */
-export const VISUAIS_DADOS = {
-  ficha: { nome: "Cor da minha ficha" },
-  obsidiana: { nome: "Obsidiana", color: "#15151d", numberColor: "#e8c36a", metalness: 0.65, roughness: 0.22, sheen: 0.4 },
-  ouro: { nome: "Ouro", color: "#c9a24b", numberColor: "#1a1208", metalness: 0.95, roughness: 0.18 },
-  marfim: { nome: "Marfim", color: "#e9e2cf", numberColor: "#3a2d1c", metalness: 0, roughness: 0.55 },
-  sangue: { nome: "Sangue", color: "#7a1620", numberColor: "#ffe9e9", metalness: 0.2, roughness: 0.3, sheen: 0.6 },
-  esmeralda: { nome: "Esmeralda", color: "#1d6b4d", numberColor: "#eafff3", metalness: 0.3, roughness: 0.2, sheen: 0.5 },
-  gelo: { nome: "Gelo", color: "#9fd4ff", numberColor: "#07263f", opacity: 0.78, roughness: 0.08, metalness: 0.1 },
-  noite: { nome: "Noite estrelada", color: "#2b2466", numberColor: "#f6e9ff", metalness: 0.5, roughness: 0.25, sheen: 0.7, font: "aelfa" },
-};
-
 export const cabecalhoDe = meta => meta?.[CHAVE] || null;
 
 /** Remonta a ficha completa a partir dos metadados de um jogador. */
@@ -94,3 +83,13 @@ export async function lerFicha(meta) {
 
 export const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento: segue na memória */ } };
 export const ler = k => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
+
+/** Só aceita cor em hexadecimal: a ficha vem de arquivo ou de outro jogador. */
+export const corSegura = (c, padrao = "#9a9aa4") => (/^#[0-9a-f]{3,8}$/i.test(String(c)) ? c : padrao);
+
+// ── histórico dos recursos (só no navegador do jogador) ───────
+export const HISTORICO = "senshi/historico";
+export function registrar(rc, de, para, origem = "") {
+  if (de === para) return;
+  guardar(HISTORICO, [{ t: Date.now(), id: rc.id, nome: rc.nome, de, para, origem }, ...(ler(HISTORICO) || [])].slice(0, 40));
+}

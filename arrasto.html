@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Senshi · mover</title>
+<style>
+  html,body { margin:0; height:100%; background:transparent; overflow:hidden; cursor:grabbing; font:600 13px "Palatino Linotype",Palatino,serif; color:#fff; }
+  .alvo { position:fixed; border-radius:14px; border:1.5px solid var(--tema); background:linear-gradient(160deg,color-mix(in srgb,var(--tema) 26%,rgba(12,12,18,.82)),rgba(12,12,18,.72)); box-shadow:0 18px 50px rgba(0,0,0,.5),0 0 30px color-mix(in srgb,var(--tema) 35%,transparent); display:grid; place-items:center; letter-spacing:.1em; text-transform:uppercase; pointer-events:none; }
+  .alvo.preso { box-shadow:0 18px 50px rgba(0,0,0,.5),0 0 0 2px var(--tema),0 0 40px color-mix(in srgb,var(--tema) 60%,transparent); }
+  .outra { position:fixed; border-radius:14px; border:1px dashed rgba(255,255,255,.22); pointer-events:none; }
+  .guia { position:fixed; background:var(--tema); opacity:.85; pointer-events:none; box-shadow:0 0 8px var(--tema); }
+</style></head>
+<body>
+<script type="module">
+  // O Owlbear não move janelas de extensão. Ao arrastar, a janela dá lugar a esta moldura transparente do tamanho da
+  // tela, onde um contorno segue o mouse (com ímã nas bordas); ao soltar, a janela reabre ali.
+  import { OBR, LOCAL, ler, guardar, corSegura } from "./shared.js?v=10";
+  import { ABAS, ALTURA_MIN, lerJanelas, mudarJanela, abrirPopover, limitar } from "./janelas.js?v=10";
+  const p = new URLSearchParams(location.search), id = p.get("id"), n = k => Number(p.get(k)) || 0;
+  const FALHAS = "senshi/arrasto-falhas", IMA = 12;
+  OBR.onReady(() => {
+    const todas = lerJanelas(), j = todas[id];
+    if (!j) return OBR.popover.close(id + "-mover");
+    document.documentElement.style.setProperty("--tema", corSegura(ler(LOCAL)?.cores?.tema, "#b9a7ff"));
+    const w = j.w, h = j.min ? ALTURA_MIN : j.h, ox = n("ox"), oy = n("oy");
+    const outras = Object.entries(todas).filter(([k]) => k !== id).map(([, o]) => ({ l: o.left, t: o.top, r: o.left + o.w, b: o.top + (o.min ? ALTURA_MIN : o.h) }));
+    for (const o of outras) {
+      const d = document.createElement("div");
+      d.className = "outra";
+      Object.assign(d.style, { left: o.l + "px", top: o.t + "px", width: o.r - o.l + "px", height: o.b - o.t + "px" });
+      document.body.append(d);
+    }
+    const alvo = document.createElement("div"), gx = document.createElement("div"), gy = document.createElement("div");
+    alvo.className = "alvo"; gx.className = gy.className = "guia";
+    alvo.textContent = ABAS[j.aba]?.titulo || "Senshi";
+    Object.assign(alvo.style, { width: w + "px", height: h + "px", left: j.left + "px", top: j.top + "px" });
+    Object.assign(gx.style, { width: "1px", top: 0, bottom: 0, display: "none" });
+    Object.assign(gy.style, { height: "1px", left: 0, right: 0, display: "none" });
+    document.body.append(gx, gy, alvo);
+
+    let movido = false, acabou = false, atual = { left: j.left, top: j.top };
+    /** Encosta na linha mais próxima: [posição, linha] ou [posição, null]. */
+    const ima = (v, tam, linhas) => {
+      let melhor = [v, null], menor = IMA;
+      for (const [linha, desloc] of linhas) { const d = Math.abs(v - (linha - desloc)); if (d < menor) { menor = d; melhor = [linha - desloc, linha]; } }
+      return melhor;
+    };
+    function mover(e) {
+      const W = innerWidth, H = innerHeight;
+      let left = e.clientX - ox, top = e.clientY - oy, lx = null, ly = null;
+      if (!e.altKey) {
+        [left, lx] = ima(left, w, [[8, 0], [W - 8, w], ...outras.flatMap(o => [[o.l, 0], [o.r + 8, 0], [o.r, w], [o.l - 8, w]])]);
+        [top, ly] = ima(top, h, [[8, 0], [H - 8, h], ...outras.flatMap(o => [[o.t, 0], [o.b + 8, 0], [o.b, h], [o.t - 8, h]])]);
+      }
+      atual = { left: Math.round(limitar(left, 0, W - 120)), top: Math.round(limitar(top, 0, H - ALTURA_MIN)) };
+      alvo.style.left = atual.left + "px"; alvo.style.top = atual.top + "px";
+      alvo.classList.toggle("preso", lx != null || ly != null);
+      gx.style.display = lx == null ? "none" : ""; gx.style.left = lx + "px";
+      gy.style.display = ly == null ? "none" : ""; gy.style.top = ly + "px";
+    }
+    async function terminar(cancelar) {
+      if (acabou) return;
+      acabou = true;
+      // se o mouse nunca chegou aqui, depois de 2 vezes a janela passa a usar o arrasto simples
+      if (movido) guardar(FALHAS, 0); else if (!cancelar) guardar(FALHAS, (ler(FALHAS) || 0) + 1);
+      if (!cancelar) mudarJanela(id, atual);
+      await abrirPopover(id);
+      await OBR.popover.close(id + "-mover");
+    }
+    addEventListener("pointermove", e => {
+      if (acabou) return;
+      const soltou = !(e.buttons & 1);
+      if (soltou && movido) return terminar(false);
+      movido = true;
+      mover(e);
+      if (soltou) terminar(false);                      // soltou antes de a moldura abrir: fica onde o mouse está
+    });
+    addEventListener("pointerup", () => terminar(false));
+    addEventListener("keydown", e => { if (e.key === "Escape") terminar(true); });
+    setTimeout(() => { if (!movido) terminar(false); }, 1800);      // rede de segurança: a moldura nunca fica presa
+  });
+</script>
+</body></html>

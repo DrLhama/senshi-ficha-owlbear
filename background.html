@@ -2,10 +2,23 @@
 <html lang="pt-BR"><head><meta charset="utf-8"><title>Senshi · fundo</title></head>
 <body>
 <script type="module">
-  // Fica ligado mesmo com o painel fechado: aplica na ficha do jogador o ajuste de recurso
-  // pedido pelo mestre e republica a ficha para a mesa.
-  import { OBR, CANAL_AJUSTE, LOCAL, ler, guardar, publicarFicha, aplicarExpressao } from "./shared.js?v=8";
-  OBR.onReady(() => {
+  // Fica ligado sem nenhuma janela aberta: aplica na ficha o ajuste pedido pelo mestre, avisa a vez no combate
+  // e cuida das janelas (reabre as que estavam na tela, organiza, fecha).
+  import { OBR, CANAL_AJUSTE, CHAVE_INI, LOCAL, ler, guardar, publicarFicha, aplicarExpressao, registrar } from "./shared.js?v=10";
+  import { RESULTADO, CHAVE_ROLAGENS } from "./dados.js?v=10";
+  import { CONFIG, canal, lerJanelas, abrirPopover, limparJanelas, organizar, fecharOutras } from "./janelas.js?v=10";
+
+  let vezAnterior;
+  function vez(meta) {
+    const ini = meta[CHAVE_INI];
+    const minha = !!ini?.ativo && !!ini.combatentes?.some(c => c.id === ini.vez && c.jogador === OBR.player.id);
+    const marca = minha ? `${ini.ciclo}:${ini.turno}:${ini.vez}` : "";
+    if (marca && marca !== vezAnterior && vezAnterior !== undefined) OBR.notification.show("É a sua vez!", "SUCCESS");
+    if (marca !== vezAnterior) OBR.action.setBadgeText(minha ? "!" : undefined).catch(() => {});
+    vezAnterior = marca;
+  }
+
+  OBR.onReady(async () => {
     OBR.broadcast.onMessage(CANAL_AJUSTE, async ({ data }) => {
       if (!data || data.para !== OBR.player.id) return;
       const ficha = ler(LOCAL);
@@ -14,10 +27,30 @@
       // o mestre manda o texto digitado (+25, -50%…): quem aplica é a ficha do jogador, sobre o valor dela
       const novo = aplicarExpressao(rc.atual, rc.max, data.expr ?? data.atual);
       if (novo == null) return;
+      registrar(rc, rc.atual, novo, "mestre");
       rc.atual = novo;
       guardar(LOCAL, ficha);
       await publicarFicha(ficha);
     });
+
+    // anota o resultado mesmo que a janela que pediu já tenha sido fechada ou movida
+    OBR.broadcast.onMessage(RESULTADO, async ({ data, connectionId }) => {
+      if (typeof data?.total !== "number" || connectionId !== await OBR.player.getConnectionId()) return;
+      const nota = { t: Date.now(), nome: String(data.rotulo || ""), notacao: String(data.formula || ""), total: data.total, texto: String(data.texto || "") };
+      guardar(CHAVE_ROLAGENS, [nota, ...(ler(CHAVE_ROLAGENS) || [])].slice(0, 40));
+    });
+
+    if (canal) canal.onmessage = ({ data }) => {
+      if (data?.t === "organizar") organizar();
+      else if (data?.t === "fechar-outras") fecharOutras(data.menos);
+      else if (data?.t === "reabrir") OBR.popover.close(data.id).then(() => abrirPopover(data.id));
+    };
+
+    vez(await OBR.room.getMetadata());
+    OBR.room.onMetadataChange(vez);
+
+    if ((ler(CONFIG) || {}).reabrir === false) limparJanelas();
+    else for (const id of Object.keys(lerJanelas())) await abrirPopover(id);
   });
 </script>
 </body></html>
