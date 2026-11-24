@@ -1,7 +1,7 @@
-import { OBR, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, cabecalhoDe, lerFicha, guardar, aplicarExpressao } from "./shared.js?v=14";
-import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=14";
-import { barra, fichaView } from "./paineis.js?v=14";
-import { novaJanela } from "./janelas.js?v=14";
+import { OBR, CANAL_AJUSTE, CHAVE_INI, LOCAL_INI, cabecalhoDe, lerFicha, guardar, aplicarExpressao } from "./shared.js?v=15";
+import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=15";
+import { barra, fichaView } from "./paineis.js?v=15";
+import { novaJanela } from "./janelas.js?v=15";
 
 // ── mesa (mestre) ─────────────────────────────────────────────
 function pedirAjuste(jogador, rc, expr) {

@@ -1,5 +1,5 @@
-import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=14";
-import { estado, redesenhar } from "./nucleo.js?v=14";
+import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=15";
+import { estado, redesenhar } from "./nucleo.js?v=15";
 
 // ── rolagens pelos Senshi Dados ───────────────────────────────
 // A outra extensão recebe o pedido, abre com os dados prontos e devolve um resultado por linha.
@@ -16,7 +16,7 @@ export function suportada(formula) {
   if (!/^[+-]?(\d*[de]\d+|\d+)([+-](\d*[de]\d+|\d+))*$/.test(s) || /-\d*[de]/.test(s)) return false;
   const dados = [...s.matchAll(/(\d*)([de])(\d+)/g)].map(m => [Number(m[1] || 1), Number(m[3]), m[2]]);
   const soma = l => l.reduce((n, [q]) => n + q, 0);
-  return dados.length > 0 && dados.every(([q, f]) => q >= 1 && q <= 50 && f >= 2 && f <= 100000) && soma(dados) <= 60 && soma(dados.filter(([, f, l]) => l === "d" && f >= 100)) <= 6 && soma(dados.filter(([, , l]) => l === "e")) <= 3;
+  return dados.length > 0 && dados.every(([q, f]) => q >= 1 && q <= 50 && f >= 2 && f <= 100000) && soma(dados) <= 60 && soma(dados.filter(([, f, l]) => l === "d" && f >= 100)) <= 6 && soma(dados.filter(([, , l]) => l === "e")) <= 12;
 }
 
 async function pedirSenshiDados(notacao, chave, nome) {
