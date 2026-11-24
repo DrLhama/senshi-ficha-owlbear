@@ -1,5 +1,5 @@
-import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=10";
-import { estado, redesenhar } from "./nucleo.js?v=10";
+import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=11";
+import { estado, redesenhar } from "./nucleo.js?v=11";
 
 // ── rolagens pelos Senshi Dados ───────────────────────────────
 // A outra extensão recebe o pedido, abre com os dados prontos e devolve um resultado por linha.
@@ -38,11 +38,15 @@ function escutarSenshiDados() {
   OBR.broadcast.onMessage(RESULTADO, ({ data }) => {
     const corte = String(data?.id || "").lastIndexOf(":"), p = pedidos.get(String(data?.id || "").slice(0, corte));
     if (!p) return;                                       // só a janela que pediu mostra; quem anota é o fundo
-    if (data.erro) gravarResultado(p.chave, { total: undefined, texto: undefined, erro: String(data.erro) });
+    if (data.cancelado) ultimas.get(p.chave)?.pronto && gravarResultado(p.chave, {});
+    else if (data.erro) gravarResultado(p.chave, { erro: String(data.erro) });
     else {
       p.partes[Number(String(data.id).slice(corte + 1))] = { rotulo: data.rotulo, total: data.total, texto: data.texto };
       const feitas = p.partes.filter(Boolean), uma = p.total === 1;
-      gravarResultado(p.chave, { erro: undefined, total: uma ? feitas[0].total : undefined, texto: uma ? feitas[0].texto : feitas.map(x => `${x.rotulo || "Dado"}: ${x.total}`).join(" · ") });
+      // o mesmo atributo clicado duas vezes: os dois resultados chegam juntos e aparecem lado a lado
+      const antes = ultimas.get(p.chave), junto = uma && antes?.chegou && Date.now() - antes.chegou < 1500 ? antes : null;
+      if (uma) gravarResultado(p.chave, { chegou: Date.now(), total: junto ? `${junto.total} · ${feitas[0].total}` : feitas[0].total, texto: junto ? `${junto.texto} | ${feitas[0].texto}` : feitas[0].texto });
+      else gravarResultado(p.chave, { texto: feitas.map(x => `${x.rotulo || "Dado"}: ${x.total}`).join(" · ") });
     }
     redesenhar();
   });
@@ -90,7 +94,7 @@ export async function rolar(notacao, chave, nome = "") {
   gravarResultado(chave, { texto: "Abrindo os dados…", total: undefined, erro: undefined });
   redesenhar();
   if ((ler(CHAVE_SISTEMA) || "senshi") === "senshi" && await pedirSenshiDados(notacao, chave, nome)) {
-    gravarResultado(chave, { texto: "Dados prontos: role na janela de dados." });
+    gravarResultado(chave, { pronto: true, texto: "Na bandeja. Escolha mais ou role na janela de dados." });
     return redesenhar();
   }
   if (!(await dicePlusPronto())) {

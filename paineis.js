@@ -1,8 +1,8 @@
-import { HISTORICO, VERSAO, guardar, ler, corSegura } from "./shared.js?v=10";
-import { h, icone, botaoIcone, estado, rascunho, ui, redesenhar, details, chip, titulo, campo, seletor, confirmar } from "./nucleo.js?v=10";
-import { ALVOS_ROLAGEM, CHAVE_ALVO, CHAVE_ROLAGENS, CHAVE_SISTEMA, SISTEMAS, rolar, ultimas, notacaoDoAtributo } from "./dados.js?v=10";
-import { mudarRecurso, desfazer, retirarFicha, novaEntradaArquivo, semFicha, retrato, trocarRetrato } from "./minha.js?v=10";
-import { FILTROS, formAberto, abrirFormSkill, formularioSkill, restaurarOcultas, skillsVisiveis, skillsFiltradas, listaSkills } from "./skills.js?v=10";
+import { HISTORICO, VERSAO, guardar, ler, corSegura } from "./shared.js?v=11";
+import { h, icone, botaoIcone, estado, rascunho, ui, redesenhar, details, chip, titulo, campo, seletor, confirmar } from "./nucleo.js?v=11";
+import { ALVOS_ROLAGEM, CHAVE_ALVO, CHAVE_ROLAGENS, CHAVE_SISTEMA, SISTEMAS, rolar, ultimas, notacaoDoAtributo } from "./dados.js?v=11";
+import { mudarRecurso, desfazer, retirarFicha, novaEntradaArquivo, semFicha, retrato, trocarRetrato } from "./minha.js?v=11";
+import { FILTROS, formAberto, abrirFormSkill, formularioSkill, restaurarOcultas, skillsVisiveis, skillsFiltradas, listaSkills } from "./skills.js?v=11";
 
 // ── recursos ──────────────────────────────────────────────────
 const ultimoValor = new Map();      // recurso -> valor da última tela, para perceber o que mudou
@@ -81,16 +81,30 @@ function resultadoLivre(chave) {
   return r && (r.texto || r.erro) ? h("div", { class: "resultado" + (r.erro ? " erro" : "") }, r.erro || h("div", { class: "rolou" }, r.total != null ? h("b", {}, r.total) : null, h("span", {}, r.texto))) : null;
 }
 
+/** O resultado de cada atributo da última rolagem, e o aviso de quantos esperam na bandeja. */
+function resultadosDosAtributos(f) {
+  const lista = f.atributos.map(a => [a, ultimas.get("attr:" + a.key)]).filter(([, r]) => r);
+  const prontos = lista.filter(([, r]) => r.pronto), feitos = lista.filter(([, r]) => !r.pronto && (r.total != null || r.texto || r.erro));
+  if (!prontos.length && !feitos.length) return null;
+  return h("div", { class: "resultado" },
+    prontos.length ? h("div", {}, h("b", {}, `${prontos.map(([a]) => a.nome).join(" + ")} na bandeja. `), h("span", { class: "mudo" }, "Escolha mais ou role na janela de dados.")) : null,
+    feitos.map(([a, r]) => h("div", { class: "rolou" }, r.total != null ? h("b", {}, r.total) : null, h("span", {}, r.erro || `${a.nome} · ${r.texto}`))));
+}
+
 export const blocoAtributos = (f, rola) => [
   h("div", { class: "attrs" }, f.atributos.map(a => {
     const nota = rola && notacaoDoAtributo(a.dado), chave = "attr:" + a.key;
     const miolo = [h("small", {}, a.nome), h("b", {}, a.valor), h("i", {}, a.dado)];
     const estilo = { "--cor": corSegura(a.cor, "var(--tema)") };
     return nota
-      ? h("button", { class: "attr", style: estilo, title: `Rolar ${nota} de ${a.nome}`, onclick: () => { ui.ultAttr = chave; rolar(nota, chave, a.nome); } }, miolo)
+      ? h("button", { class: "attr", "data-pronto": !!ultimas.get(chave)?.pronto, style: estilo, title: `Pôr ${nota} de ${a.nome} na bandeja (clique em vários para rolar juntos)`, onclick: () => {
+        // rolagem nova: os resultados da anterior saem
+        if (!f.atributos.some(x => ultimas.get("attr:" + x.key)?.pronto)) f.atributos.forEach(x => ultimas.delete("attr:" + x.key));
+        rolar(nota, chave, a.nome);
+      } }, miolo)
       : h("div", { class: "attr", style: estilo }, miolo);
   })),
-  rola && ui.ultAttr ? resultadoLivre(ui.ultAttr) : null,
+  rola ? resultadosDosAtributos(f) : null,
   f.secundarios?.length ? [titulo("Secundários"), h("div", { class: "chips" }, f.secundarios.map(s => chip(s.nome, s.valor)))] : null,
 ];
 

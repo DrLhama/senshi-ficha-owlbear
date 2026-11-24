@@ -1,7 +1,7 @@
-import OBR from "./obr.js?v=10";
+import OBR from "./obr.js?v=11";
 
 export { OBR };
-export const VERSAO = "10";
+export const VERSAO = "11";
 export const CHAVE = "senshi/f";                  // metadados do jogador: cabeçalho + pedaços da ficha
 export const LOCAL = "senshi/ficha";              // cópia completa, só no navegador do jogador
 export const CANAL_AJUSTE = "senshi.ajuste";      // o mestre pede ao jogador para mudar um recurso
