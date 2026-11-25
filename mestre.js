@@ -1,8 +1,8 @@
-import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=17";
-import { INI_VAZIA, avancar, alternarPronto, combatenteDe, coresDaFicha, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=17";
-import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=17";
-import { barra, fichaView } from "./paineis.js?v=17";
-import { novaJanela } from "./janelas.js?v=17";
+import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=18";
+import { INI_VAZIA, avancar, alternarPronto, combatenteDe, coresDaFicha, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, iniciarSemRolar, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=18";
+import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=18";
+import { barra, fichaView } from "./paineis.js?v=18";
+import { novaJanela } from "./janelas.js?v=18";
 
 // ── mesa (mestre) ─────────────────────────────────────────────
 function pedirAjuste(jogador, rc, expr) {
@@ -132,6 +132,12 @@ function painelMestre() {
       if (nova) { estado.iniMestre = nova; redesenhar(); }
     } catch { OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR"); }
   };
+  const comecar = async () => {
+    try {
+      const nova = await iniciarSemRolar(ini, estado.jogadores);
+      if (nova) { estado.iniMestre = nova; redesenhar(); }
+    } catch { OBR.notification.show("O Owlbear não aceitou publicar a iniciativa.", "ERROR"); }
+  };
   const marca = (chave, padrao, rotulo, dica) => {
     const el = h("input", { type: "checkbox", onchange: e => { rascunho[chave] = e.target.checked ? "1" : "0"; } });
     el.checked = (rascunho[chave] ?? padrao) === "1";
@@ -142,7 +148,9 @@ function painelMestre() {
     const p = c.jogador && estado.jogadores.find(x => x.id === c.jogador), cab = p && cabecalhoDe(p.metadata), vida = cab?.recursos?.[0];
     const valor = h("input", { type: "number", class: "ini-valor", placeholder: "–", title: "Resultado da iniciativa. Mude aqui e clique em Ordenar.", "aria-label": `Iniciativa de ${c.nome}`, "data-foco": "iv:" + c.id, onchange: e => por(c, { valor: e.target.value === "" ? undefined : Number(e.target.value) }) });
     valor.value = c.valor ?? "";
-    const dado = h("input", { class: "ini-dado", title: "Dado e bônus", "aria-label": `Dado de ${c.nome}`, "data-foco": "id:" + c.id, onchange: e => { const d = lerDado(e.target.value); d ? por(c, { dado: d, valor: undefined }) : redesenhar(); } });
+    const dado = h("input", { class: "ini-dado", title: "Dado e bônus", "aria-label": `Dado de ${c.nome}`, "data-foco": "id:" + c.id, onchange: e => { const d = lerDado(e.target.value); d ? por(c, { dado: d, valor: undefined, fixo: false }) : redesenhar(); } });
+    const fixo = h("input", { type: "number", class: "ini-valor", placeholder: "fixo", title: "Valor fixo: entra com este número, sem rolar. Apague para voltar a rolar o dado.", "aria-label": `Valor fixo de ${c.nome}`, "data-foco": "if:" + c.id, onchange: e => por(c, e.target.value === "" ? { fixo: false, valor: undefined } : { fixo: true, valor: Number(e.target.value) }) });
+    fixo.value = c.fixo ? c.valor ?? "" : "";
     dado.value = c.dado ? escreverDado(c.dado) : "";
     return h("li", {
       draggable: "true", "data-vez": ini.ativo && c.id === ini.vez, "data-oculto": !c.visivel, style: { "--cor": corSegura(c.cor) },
@@ -152,12 +160,12 @@ function painelMestre() {
       ondragend: () => { arrastando = null; },
     },
     h("button", { class: "marca", title: "Dar a vez a este combatente", onclick: () => mudar({ vez: c.id }), "aria-label": `Dar a vez a ${c.nome}` }, ini.ativo && c.id === ini.vez ? "▶" : i + 1),
-    ini.ativo ? valor : dado,
+    ini.ativo ? valor : [dado, fixo],
     h("span", { class: "nome", title: c.nome }, nomeDe(c), vida ? h("span", { class: "fio", style: { "--p": (vida.max > 0 ? Math.max(0, Math.min(100, vida.atual / vida.max * 100)) : 0) + "%", "--cor": corSegura(vida.cor) }, title: `${vida.nome} ${vida.atual}/${vida.max}` }) : null),
     p && cab ? botaoIcone("jogador", "Abrir a ficha", () => abrirFicha(p.id)) : null,
     c.jogador ? null : h("button", { class: "ico", title: c.oculta ? "Bônus escondido: os jogadores veem só o número do dado. Clique para mostrar." : "Bônus à mostra. Clique para esconder.", "aria-label": c.oculta ? `Mostrar o bônus de ${c.nome}` : `Esconder o bônus de ${c.nome}`, onclick: () => por(c, { oculta: !c.oculta }) }, c.oculta ? "🙈" : "±"),
     h("button", { class: "ico", title: c.visivel ? "Visível para os jogadores. Clique para ocultar." : "Oculto dos jogadores. Clique para mostrar.", "aria-label": c.visivel ? `Ocultar ${c.nome}` : `Mostrar ${c.nome}`, onclick: () => por(c, { visivel: !c.visivel }) }, c.visivel ? "👁" : "—"),
-    ini.ativo ? h("span", { class: "sobe" }, h("button", { onclick: () => mover(i, i - 1), "aria-label": `Subir ${c.nome}`, disabled: i === 0 }, "▴"), h("button", { onclick: () => mover(i, i + 1), "aria-label": `Descer ${c.nome}`, disabled: i === lista.length - 1 }, "▾")) : null,
+    h("span", { class: "sobe" }, h("button", { onclick: () => mover(i, i - 1), "aria-label": `Subir ${c.nome}`, disabled: i === 0 }, "▴"), h("button", { onclick: () => mover(i, i + 1), "aria-label": `Descer ${c.nome}`, disabled: i === lista.length - 1 }, "▾")),
     botaoIcone("fechar", `Remover ${c.nome}`, () => { const combatentes = lista.filter(x => x.id !== c.id); mudar({ combatentes, vez: ini.vez === c.id ? (combatentes[Math.min(i, combatentes.length - 1)]?.id ?? null) : ini.vez }); }));
   };
 
@@ -172,9 +180,10 @@ function painelMestre() {
         prontos.length ? h("div", { class: "roletinhas" }, prontos.map(([p, x]) => roletinha(x.nome || p.name, x.cor || p.color, x.dado))) : h("p", { class: "mudo" }, "Ninguém está com o dado na mão ainda."),
         h("div", { class: "linha" },
           h("button", { "aria-pressed": String(!!ini.chamada), title: "Mostra o botão de rolar no alto da tela de todos", onclick: () => mudar({ chamada: !ini.chamada }) }, ini.chamada ? "Chamando…" : "Chamar jogadores"),
-          h("button", { class: "forte cresce", onclick: iniciar, disabled: !prontos.length && !lista.length }, `Iniciar iniciativa (${lista.length + esperando.length})`))),
+          h("button", { class: "forte cresce", onclick: iniciar, disabled: !prontos.length && !lista.length }, `Iniciar iniciativa (${lista.length + esperando.length})`)),
+        h("button", { class: "cresce", title: "Começa já, na ordem da lista e com os valores que você pôs: sem rolar e sem animação. Mude a ordem com ▴ ▾ ou arrastando.", onclick: comecar, disabled: !prontos.length && !lista.length }, "Começar sem rolar")),
     ini.ativo && esperando.length ? h("div", { class: "nota linha" }, h("span", { class: "cresce" }, `${esperando.map(([p, x]) => x.nome || p.name).join(", ")} quer entrar.`), h("button", { onclick: () => juntar(esperando.map(([p, x]) => combatenteDe(p, x))) }, "Deixar entrar")) : null,
-    titulo("Combatentes", ini.ativo ? h("button", { class: "link", title: "Do maior valor para o menor", onclick: () => mudar({ combatentes: ordenar(lista) }) }, "Ordenar") : null),
+    titulo("Combatentes", ini.ativo ? h("button", { class: "link", title: "Do maior valor para o menor", onclick: () => mudar({ combatentes: ordenar(lista) }) }, "Ordenar") : esperando.length ? h("button", { class: "link", title: "Põe na lista quem está com o dado na mão, para você mudar a ordem ou fixar o valor", onclick: () => juntar(esperando.map(([p, x]) => combatenteDe(p, x))) }, `Pôr os prontos (${esperando.length})`) : null),
     h("ul", { class: "ini-lista" }, lista.length ? lista.map(linha) : h("li", { class: "mudo" }, "Só os jogadores prontos, por enquanto.")),
     titulo("Adicionar", semClicar.length ? h("button", { class: "link", title: "Usa a Agilidade da ficha de quem não clicou", onclick: porTodos }, `Jogadores que faltam (${semClicar.length})`) : null),
     h("div", { class: "linha" }, campo("ini-nome", { placeholder: "Nome, ou Goblin x3", "aria-label": "Nome do combatente", onkeydown: e => { if (e.key === "Enter") adicionar(); } }),

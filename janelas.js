@@ -1,4 +1,4 @@
-import { OBR, VERSAO, ler, guardar } from "./shared.js?v=17";
+import { OBR, VERSAO, ler, guardar } from "./shared.js?v=18";
 
 /** Janelas livres: cada uma é um popover do Owlbear com abas. O registro guarda onde estão, para reabrir no mesmo lugar. */
 const REGISTRO = "senshi/janelas-v9";

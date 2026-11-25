@@ -1,5 +1,5 @@
-import { OBR, CHAVE_INI, LOCAL, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=17";
-import { notacaoDoAtributo } from "./dados.js?v=17";
+import { OBR, CHAVE_INI, LOCAL, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=18";
+import { notacaoDoAtributo } from "./dados.js?v=18";
 
 /** As contas da iniciativa, sem desenho: usadas pela janela, pela bússola e pelo fundo. */
 export const CANAL_PASSO = "senshi.ini-passo";      // alguém clicou numa seta da bússola; quem muda é o fundo do mestre
@@ -91,6 +91,8 @@ const sorte = f => {
   return (u[0] % f) + 1;
 };
 const rolar = c => {
+  // valor fixo: entra com este número, sem rolar
+  if (c.fixo && c.valor != null) return { ...c, base: c.valor };
   if (!c.dado) return c.valor == null ? rolar({ ...c, dado: { q: 1, f: 100, b: 0 } }) : { ...c, base: c.valor };
   let base = 0;
   for (let i = 0; i < c.dado.q; i++) base += sorte(c.dado.f);
@@ -110,14 +112,26 @@ export async function iniciarIniciativa(ini, jogadores) {
     if (!pronto) continue;
     const i = lista.findIndex(c => c.jogador === p.id);
     if (i < 0) lista.push(combatenteDe(p, pronto));
-    else lista[i] = { ...lista[i], ...combatenteDe(p, pronto), id: lista[i].id, visivel: lista[i].visivel };
+    else if (!lista[i].fixo) lista[i] = { ...lista[i], ...combatenteDe(p, pronto), id: lista[i].id, visivel: lista[i].visivel };
   }
   if (!lista.length) return null;
   const combatentes = ordenar(lista.map(rolar)), rol = { id: novoId(), t: Date.now() };
   const nova = { ...ini, ativo: true, chamada: false, ciclo: 1, vez: combatentes[0].id, combatentes, rol };
-  const lados = combatentes.filter(c => c.visivel).slice(0, MAX_LADOS).map(c => ({ nome: c.nome, cor: corSegura(c.cor), ...(c.cor2 && { cor2: corSegura(c.cor2) }), rotulo: "", faces: c.dado ? c.dado.q * c.dado.f : 0, base: c.base, bonus: c.oculta ? null : c.dado?.b || 0, nat: 0 }));
+  const lados = combatentes.filter(c => c.visivel).slice(0, MAX_LADOS).map(c => ({ nome: c.nome, cor: corSegura(c.cor), ...(c.cor2 && { cor2: corSegura(c.cor2) }), rotulo: "", faces: c.dado && !c.fixo ? c.dado.q * c.dado.f : 0, base: c.base, bonus: c.oculta ? null : c.fixo ? 0 : c.dado?.b || 0, nat: 0 }));
   await publicarIni(nova);
   if (lados.length) await OBR.broadcast.sendMessage(CONFRONTO, { id: rol.id, modo: "iniciativa", lados, rapido: false }, { destination: "ALL" });
+  return nova;
+}
+/** Começa já, na ordem da lista (quem está com o dado na mão e ainda não entrou vai para o fim), sem rolar nem animação. */
+export async function iniciarSemRolar(ini, jogadores) {
+  const combatentes = [...ini.combatentes];
+  for (const p of jogadores) {
+    const pronto = lerPronto(p.metadata);
+    if (pronto && !combatentes.some(c => c.jogador === p.id)) combatentes.push(combatenteDe(p, pronto));
+  }
+  if (!combatentes.length) return null;
+  const nova = { ...ini, ativo: true, chamada: false, ciclo: 1, vez: combatentes[0].id, combatentes, rol: null };
+  await publicarIni(nova);
   return nova;
 }
 /** Quem chega com o combate andando rola sozinho e entra no lugar dele. */
