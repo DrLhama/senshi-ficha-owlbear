@@ -1,5 +1,5 @@
-import { OBR, CHAVE, LOCAL, HISTORICO, publicarFicha, cabecalhoDe, guardar, ler, aplicarExpressao, registrar } from "./shared.js?v=18";
-import { h, estado, redesenhar } from "./nucleo.js?v=18";
+import { OBR, CHAVE, LOCAL, HISTORICO, publicarFicha, cabecalhoDe, guardar, ler, aplicarExpressao, registrar } from "./shared.js?v=19";
+import { h, estado, redesenhar } from "./nucleo.js?v=19";
 
 // ── a ficha do próprio jogador ────────────────────────────────
 export async function aplicarMinhaFicha(f) {

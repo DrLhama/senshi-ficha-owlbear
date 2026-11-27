@@ -4,11 +4,11 @@
 <script type="module">
   // Fica ligado sem nenhuma janela aberta: aplica na ficha o ajuste pedido pelo mestre, avisa a vez no combate
   // e cuida das janelas (reabre as que estavam na tela, organiza, fecha).
-  import { OBR, CANAL_AJUSTE, CHAVE_INI, LOCAL, LOCAL_INI, ler, guardar, publicarFicha, aplicarExpressao, registrar } from "./shared.js?v=18";
-  import { RESULTADO, CHAVE_ROLAGENS } from "./dados.js?v=18";
-  import { CONFIG, canal, lerJanelas, abrirPopover, limparJanelas, organizar, fecharOutras, abrirBussola, BUSSOLA, tela } from "./janelas.js?v=18";
+  import { OBR, CANAL_AJUSTE, CHAVE_INI, LOCAL, LOCAL_INI, ler, guardar, publicarFicha, aplicarExpressao, registrar } from "./shared.js?v=19";
+  import { RESULTADO, CHAVE_ROLAGENS } from "./dados.js?v=19";
+  import { CONFIG, canal, lerJanelas, abrirPopover, limparJanelas, organizar, fecharOutras, abrirBussola, BUSSOLA, tela } from "./janelas.js?v=19";
 
-  import { CANAL_PASSO, PRONTO, INI_VAZIA, avancar, faltaAnimacao, publicarIni } from "./iniciativa.js?v=18";
+  import { CANAL_PASSO, PRONTO, INI_VAZIA, avancar, faltaAnimacao, publicarIni } from "./iniciativa.js?v=19";
 
   // ── a bússola ───────────────────────────────────────────────
   let largura = 0, espera, rolAnterior;
@@ -79,6 +79,18 @@
     vez(sala);
     bussola(sala);
     OBR.room.onMetadataChange(m => { vez(m); bussola(m); });
+
+    // o mestre clica num token e vê o nome dele (aviso); só o mestre tem o item no menu
+    const TOKENS = ["CHARACTER", "MOUNT", "PROP"].map(value => ({ key: "layer", value, coordinator: "||" }));
+    OBR.contextMenu.create({
+      id: "senshi.ficha/ver-nome",
+      icons: [{ icon: new URL("icon.svg", location.href).href, label: "Ver nome do token", filter: { roles: ["GM"], min: 1, max: 1, every: TOKENS } }],
+      onClick: ({ items }) => {
+        const i = items[0];
+        const nome = (i?.text?.plainText || i?.name || "Token").trim();
+        OBR.notification.show(nome, "DEFAULT");
+      },
+    }).catch(console.warn);
 
     if ((ler(CONFIG) || {}).reabrir === false) limparJanelas();
     else for (const id of Object.keys(lerJanelas())) await abrirPopover(id);

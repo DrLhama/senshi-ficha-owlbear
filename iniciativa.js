@@ -1,5 +1,5 @@
-import { OBR, CHAVE_INI, LOCAL, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=18";
-import { notacaoDoAtributo } from "./dados.js?v=18";
+import { OBR, CHAVE_INI, LOCAL, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=19";
+import { notacaoDoAtributo } from "./dados.js?v=19";
 
 /** As contas da iniciativa, sem desenho: usadas pela janela, pela bússola e pelo fundo. */
 export const CANAL_PASSO = "senshi.ini-passo";      // alguém clicou numa seta da bússola; quem muda é o fundo do mestre

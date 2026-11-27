@@ -1,5 +1,5 @@
-import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=18";
-import { estado, redesenhar } from "./nucleo.js?v=18";
+import { OBR, ler, guardar, corSegura, lerCombo } from "./shared.js?v=19";
+import { estado, redesenhar } from "./nucleo.js?v=19";
 
 // ── rolagens pelos Senshi Dados ───────────────────────────────
 // A outra extensão recebe o pedido, abre com os dados prontos e devolve um resultado por linha.

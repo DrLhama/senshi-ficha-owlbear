@@ -35,10 +35,10 @@
 <div id="corpo"></div>
 <script type="module">
   // A bússola: fica presa no alto da tela de todos enquanto há combate. Qualquer um avança ou volta; quem muda é o fundo do mestre.
-  import { OBR, CHAVE_INI, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=18";
-  import { h } from "./nucleo.js?v=18";
-  import { canal } from "./janelas.js?v=18";
-  import { CANAL_PASSO, alternarPronto, dadoDaFicha, escreverDado, iniciarIniciativa, lerPronto, novoId, INI_VAZIA } from "./iniciativa.js?v=18";
+  import { OBR, CHAVE_INI, LOCAL_INI, corSegura, guardar, ler } from "./shared.js?v=19";
+  import { h } from "./nucleo.js?v=19";
+  import { canal } from "./janelas.js?v=19";
+  import { CANAL_PASSO, alternarPronto, dadoDaFicha, escreverDado, iniciarIniciativa, lerPronto, novoId, INI_VAZIA } from "./iniciativa.js?v=19";
 
   const LARGURA = 116, LADO = 6, corpo = document.getElementById("corpo");
   let souGM = false, publica = null, jogadores = [], meuPronto = null, celulas = new Map(), assinatura = "", trilho = null;

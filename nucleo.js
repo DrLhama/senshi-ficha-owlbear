@@ -1,4 +1,4 @@
-import { ler, guardar } from "./shared.js?v=18";
+import { ler, guardar } from "./shared.js?v=19";
 
 export const ID = new URLSearchParams(location.search).get("id") || "";
 export const $ = sel => document.querySelector(sel);
