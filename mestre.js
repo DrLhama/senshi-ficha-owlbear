@@ -1,8 +1,8 @@
-import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=19";
-import { INI_VAZIA, avancar, alternarPronto, combatenteDe, coresDaFicha, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, iniciarSemRolar, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=19";
-import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=19";
-import { barra, fichaView } from "./paineis.js?v=19";
-import { novaJanela } from "./janelas.js?v=19";
+import { OBR, CANAL_AJUSTE, cabecalhoDe, corSegura, lerFicha, aplicarExpressao } from "./shared.js?v=20";
+import { INI_VAZIA, avancar, alternarPronto, combatenteDe, coresDaFicha, corDoNome, dadoDaFicha, entrarNoMeio, escreverDado, faltaAnimacao, iniciarIniciativa, iniciarSemRolar, lerDado, lerPronto, novoId, ordenar, publicarIni } from "./iniciativa.js?v=20";
+import { h, botaoIcone, estado, abertos, rascunho, ui, redesenhar, details, titulo, campo, seletor, confirmar } from "./nucleo.js?v=20";
+import { barra, fichaView } from "./paineis.js?v=20";
+import { novaJanela } from "./janelas.js?v=20";
 
 // ── mesa (mestre) ─────────────────────────────────────────────
 function pedirAjuste(jogador, rc, expr) {

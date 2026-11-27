@@ -1,11 +1,11 @@
-import { OBR, LOCAL, CHAVE_INI, LOCAL_INI, guardar, ler, lerFicha, cabecalhoDe, corSegura } from "./shared.js?v=19";
-import { ABAS, ALTURA_MIN, CONFIG, abasDe, lerJanelas, mudarJanela, tirarJanela, abrirPopover, novaJanela, limitar, tela, endereco, canal, coberta } from "./janelas.js?v=19";
-import { ID, $, h, icone, botaoIcone, estado, rolagens, salvarUi, definirPintura, redesenhar } from "./nucleo.js?v=19";
-import { escutarDados } from "./dados.js?v=19";
-import { aplicarMinhaFicha, instalarSoltar } from "./minha.js?v=19";
-import { painelAtributos, painelRecursos, painelSkills, painelDados, painelNotas } from "./paineis.js?v=19";
-import { painelMesa, painelJogador, painelIniciativa, minhaVez } from "./mestre.js?v=19";
-import { INI_VAZIA, lerPronto } from "./iniciativa.js?v=19";
+import { OBR, LOCAL, CHAVE_INI, LOCAL_INI, guardar, ler, lerFicha, cabecalhoDe, corSegura } from "./shared.js?v=20";
+import { ABAS, ALTURA_MIN, CONFIG, abasDe, lerJanelas, mudarJanela, tirarJanela, abrirPopover, novaJanela, limitar, tela, endereco, canal, coberta } from "./janelas.js?v=20";
+import { ID, $, h, icone, botaoIcone, estado, rolagens, salvarUi, definirPintura, redesenhar } from "./nucleo.js?v=20";
+import { escutarDados } from "./dados.js?v=20";
+import { aplicarMinhaFicha, instalarSoltar } from "./minha.js?v=20";
+import { painelAtributos, painelRecursos, painelSkills, painelDados, painelNotas } from "./paineis.js?v=20";
+import { painelMesa, painelJogador, painelIniciativa, minhaVez } from "./mestre.js?v=20";
+import { INI_VAZIA, lerPronto } from "./iniciativa.js?v=20";
 
 const PAINEIS = { ficha: painelAtributos, recursos: painelRecursos, skills: painelSkills, dados: painelDados, iniciativa: painelIniciativa, notas: painelNotas, mesa: painelMesa, jogador: painelJogador };
 const janela = () => lerJanelas()[ID] || {};

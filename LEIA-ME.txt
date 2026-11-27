@@ -12,4 +12,4 @@ paineis.js       Ficha, Recursos, Skills, Dados e Notas
 mestre.js        Mesa, ficha de jogador e Iniciativa
 skills.js, dados.js, minha.js, nucleo.js, shared.js, obr.js (SDK do Owlbear)
 
-Ao mudar algo: trocar ?v=19 por ?v=19 em todos os arquivos e VERSAO em shared.js.
+Ao mudar algo: trocar ?v=20 por ?v=20 em todos os arquivos e VERSAO em shared.js.

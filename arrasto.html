@@ -11,8 +11,8 @@
 <script type="module">
   // O Owlbear não move janelas de extensão. Ao arrastar, a janela dá lugar a esta moldura transparente do tamanho da
   // tela, onde um contorno segue o mouse (com ímã nas bordas); ao soltar, a janela reabre ali.
-  import { OBR, LOCAL, ler, guardar, corSegura } from "./shared.js?v=19";
-  import { ABAS, ALTURA_MIN, lerJanelas, mudarJanela, abrirPopover, limitar } from "./janelas.js?v=19";
+  import { OBR, LOCAL, ler, guardar, corSegura } from "./shared.js?v=20";
+  import { ABAS, ALTURA_MIN, lerJanelas, mudarJanela, abrirPopover, limitar } from "./janelas.js?v=20";
   const p = new URLSearchParams(location.search), id = p.get("id"), n = k => Number(p.get(k)) || 0;
   const FALHAS = "senshi/arrasto-falhas", IMA = 12;
   OBR.onReady(() => {
